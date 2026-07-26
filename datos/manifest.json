@@ -1,0 +1,49 @@
+{
+  "snapshot_id": "aurum-market-vector-search-evaluation-v1",
+  "build_version": 1,
+  "generated_at": "2026-07-23T12:00:00+02:00",
+  "source": {
+    "name": "Shopping Queries Dataset (ESCI)",
+    "repository": "https://github.com/amazon-science/esci-data",
+    "paper": "https://arxiv.org/abs/2206.06588",
+    "license": "Apache-2.0",
+    "derived_from_snapshot": "amazon-esci-es-ann-session-02"
+  },
+  "selection": {
+    "locale": "es",
+    "catalog_size": 15000,
+    "sample_size": 1500,
+    "record_id": "UUIDv5(product_id, namespace=34ef9344-7a3f-5eb2-b30b-aceff745758d)",
+    "relevance_mapping": {
+      "E": 3,
+      "S": 2,
+      "C": 1,
+      "I": 0
+    }
+  },
+  "counts": {
+    "catalog_records": 15000,
+    "sample_records": 1500,
+    "development_queries": 8,
+    "development_qrels": 248,
+    "evaluation_queries": 12,
+    "evaluation_qrels_hidden": 264,
+    "filtered_queries": 4,
+    "catalog_events": 24,
+    "duplicate_development_cases": 14,
+    "duplicate_evaluation_cases": 14
+  },
+  "files": {
+    "datos/alumnado/altas_desarrollo.csv": "668dd4b50b536c53bd7f3680ab7b6becf127bdfc8b8ff9382a329a04deed383e",
+    "datos/alumnado/altas_evaluacion.csv": "443e7794e691ac0ba3c5bda703affc32b19ad74cdf3a2b8f7cecf0cfd8ad4327",
+    "datos/alumnado/catalogo_muestra.csv": "2e460750178919b74c6ad7f52f54bfbf326fe7661b6ef4ada9f33e35d23cf1d6",
+    "datos/alumnado/catalogo_productos.csv.gz": "f02c4eca27d2d5e83ddeb262d2a8e2aa92bc5c1bb4e6a1e4183c35f1208d5c44",
+    "datos/alumnado/consultas_desarrollo.csv": "5aad48f517767382206848f40f1efa8512eb8c0816ee67daaf6a9f2e82090ea8",
+    "datos/alumnado/consultas_evaluacion.csv": "0cf81aacf62a636fb7f4586fd879a2e629ca0c51d73b818c90c674610e55072b",
+    "datos/alumnado/consultas_filtradas.csv": "ed6a741cafb8a2fbb1a178db261cb173f115fb13d1100e769c2222e0729561bc",
+    "datos/alumnado/eventos_catalogo.csv": "65fde65556f50ca15a402a1a0358a04bb4d8ee7587012950c2c530a063a880df",
+    "datos/alumnado/relevancias_desarrollo.csv": "ab31ab9908daef483498ffcccd801826b6374485296fd1e2db59f556654b302b",
+    "datos/profesorado/duplicados_evaluacion.csv": "c257c28d5404ceb51bfaa4e055e624b448019566d32e89ca1c052def240ca4ab",
+    "datos/profesorado/relevancias_evaluacion.csv": "1dbc86f9ec72f36ebc3c7df69b6f8d4856cfad588d0bc36c10dab6323f59048a"
+  }
+}
