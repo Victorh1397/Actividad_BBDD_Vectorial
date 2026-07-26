@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurum-market.local/contracts/experiment_run.schema.json",
+  "title": "ExperimentRun",
+  "description": "Un experimento auditable. Cierra RF-06. Sin configuracion, metricas E IDs recuperados no es evidencia (principio P-06).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["experiment_id", "configuration", "metrics", "retrieved_ids", "generated_at"],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "description": "Identificador corto y estable, p. ej. E0, E1, E2, E3.",
+      "pattern": "^E[0-9]+[a-z]?$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Que variable aisla este experimento respecto a su comparacion."
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Todo lo necesario para reproducirlo exactamente.",
+      "required": ["retriever", "text_strategy", "profile"],
+      "properties": {
+        "retriever": { "enum": ["tfidf", "dense_exact", "qdrant"] },
+        "embedding_model": {
+          "type": ["string", "null"],
+          "description": "null cuando el retriever es lexico."
+        },
+        "text_strategy": {
+          "description": "Como se compone el texto que se codifica (RF-03).",
+          "enum": ["raw_text", "title_brand_color", "title_only"]
+        },
+        "metric": { "enum": ["cosine", "dot", "euclidean", "tfidf_cosine"] },
+        "normalized": { "type": "boolean" },
+        "profile": { "enum": ["sample", "full"] },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "relevance_threshold": { "type": "number" },
+        "hnsw": {
+          "type": ["object", "null"],
+          "description": "Presente solo cuando el retriever es el motor ANN.",
+          "properties": {
+            "m": { "type": "integer", "minimum": 2 },
+            "ef_construct": { "type": "integer", "minimum": 4 },
+            "ef_search": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["ndcg_at_10", "recall_at_10", "mrr_at_10"],
+      "properties": {
+        "ndcg_at_10": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recall_at_10": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mrr_at_10": { "type": "number", "minimum": 0, "maximum": 1 },
+        "per_query": {
+          "type": "array",
+          "description": "Metricas por consulta, para poder explicar la media.",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "retrieved_ids": {
+      "type": "object",
+      "description": "product_id recuperados por consulta. Permite auditar y atribuir fallos (RF-24).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Lectura del resultado: por que cambio respecto a la comparacion.",
+      "items": { "type": "string" }
+    },
+    "generated_at": { "type": "string", "format": "date-time" }
+  }
+}

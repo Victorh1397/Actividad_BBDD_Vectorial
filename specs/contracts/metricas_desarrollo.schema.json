@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurum-market.local/contracts/metricas_desarrollo.schema.json",
+  "title": "metricas_desarrollo.json",
+  "description": "Metricas minimas exigidas sobre el conjunto de desarrollo. Cierra RF-19, RF-21 y RF-25.",
+  "type": "object",
+  "required": [
+    "ndcg_at_10",
+    "recall_at_10",
+    "mrr_at_10",
+    "latency_p50_ms",
+    "latency_p95_ms"
+  ],
+  "properties": {
+    "ndcg_at_10": {
+      "type": "number",
+      "description": "nDCG@10 macro sobre las 8 consultas de desarrollo, con relevancia graduada E=3 S=2 C=1 I=0.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "recall_at_10": {
+      "type": "number",
+      "description": "Recall@10 macro. Relevante = relevancia >= relevance_threshold.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mrr_at_10": {
+      "type": "number",
+      "description": "MRR@10 macro con el mismo umbral de relevancia que recall_at_10.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "latency_p50_ms": {
+      "type": "number",
+      "description": "Percentil 50 de latencia de una consulta, en milisegundos.",
+      "exclusiveMinimum": 0
+    },
+    "latency_p95_ms": {
+      "type": "number",
+      "description": "Percentil 95 de latencia de una consulta, en milisegundos.",
+      "exclusiveMinimum": 0
+    },
+    "relevance_threshold": {
+      "type": "number",
+      "description": "Umbral declarado que define 'relevante' para recall y MRR. Fijado en 2.0 (Exact y Substitute) y constante entre experimentos.",
+      "exclusiveMinimum": 0
+    },
+    "ann_fidelity_at_10": {
+      "type": "number",
+      "description": "Solapamiento medio de IDs entre el motor ANN y el oraculo exacto (RF-20).",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "duplicates": {
+      "type": "object",
+      "description": "Metricas de la regla de duplicados sobre desarrollo (RF-23).",
+      "required": ["precision", "recall", "f1", "threshold"],
+      "properties": {
+        "precision": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recall": { "type": "number", "minimum": 0, "maximum": 1 },
+        "f1": { "type": "number", "minimum": 0, "maximum": 1 },
+        "threshold": { "type": "number" },
+        "false_positives": { "type": "integer", "minimum": 0 },
+        "false_negatives": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "description": "Contexto de la medicion de latencia. Sin esto, p50 y p95 no significan nada (RF-21).",
+      "required": ["profile", "warmup_repetitions", "repetitions"],
+      "properties": {
+        "profile": { "enum": ["sample", "full"] },
+        "warmup_repetitions": { "type": "integer", "minimum": 0 },
+        "repetitions": { "type": "integer", "minimum": 1 },
+        "query_count": { "type": "integer", "minimum": 1 },
+        "embedding_model": { "type": "string" },
+        "collection_points": { "type": "integer", "minimum": 0 },
+        "hnsw_ef_search": { "type": "integer", "minimum": 1 },
+        "python_version": { "type": "string" },
+        "platform": { "type": "string" },
+        "qdrant_version": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

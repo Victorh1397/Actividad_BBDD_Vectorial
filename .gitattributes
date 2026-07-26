@@ -1,0 +1,29 @@
+# Los ficheros de datos/ deben conservar sus bytes EXACTOS.
+#
+# Sus checksums SHA-256 están declarados en datos/manifest.json y forman parte
+# del contrato de procedencia y trazabilidad de la actividad. Con
+# core.autocrlf=true (habitual en Windows), git convertiría LF en CRLF al hacer
+# checkout y la verificación de integridad fallaría en cualquier clon, incluido
+# el del corrector. Marcarlos como no-texto desactiva toda conversión.
+datos/** -text
+
+# Normalización estándar para el código y la documentación: LF en el
+# repositorio, independientemente de la plataforma de quien lo edite.
+*.py    text eol=lf
+*.pyi   text eol=lf
+*.md    text eol=lf
+*.toml  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.json  text eol=lf
+*.cfg   text eol=lf
+*.txt   text eol=lf
+Makefile        text eol=lf
+.gitignore      text eol=lf
+.env.example    text eol=lf
+.python-version text eol=lf
+
+# Artefactos de entrega: se generan y se leen desde este repositorio, así que
+# basta con mantenerlos consistentes.
+resultados/*.csv  text eol=lf
+resultados/*.json text eol=lf

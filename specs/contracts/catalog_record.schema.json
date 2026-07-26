@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurum-market.local/contracts/catalog_record.schema.json",
+  "title": "CatalogRecord",
+  "description": "Un producto del catalogo tras el saneado. Cierra RF-03 y RF-07. La regla clave: un valor ausente es cadena vacia, nunca 'nan'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_id",
+    "product_id",
+    "title",
+    "brand",
+    "color",
+    "locale",
+    "text",
+    "catalog_version",
+    "active"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "description": "UUIDv5 estable. Es el ID del punto en la base vectorial.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "product_id": {
+      "type": "string",
+      "description": "Identificador comercial. Es el ID que se reporta en los artefactos.",
+      "minLength": 1
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "brand": {
+      "type": "string",
+      "description": "Cadena vacia cuando el dato falta. Nunca 'nan'."
+    },
+    "color": {
+      "type": "string",
+      "description": "Cadena vacia cuando el dato falta. Nunca 'nan'."
+    },
+    "locale": { "type": "string", "const": "es" },
+    "text": {
+      "type": "string",
+      "description": "Representacion textual de partida del dataset.",
+      "minLength": 1
+    },
+    "catalog_version": { "type": "integer", "minimum": 1 },
+    "active": {
+      "type": "boolean",
+      "description": "Indica si el producto forma parte del catalogo consultable."
+    }
+  }
+}

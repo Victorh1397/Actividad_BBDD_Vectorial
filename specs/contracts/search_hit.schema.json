@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurum-market.local/contracts/search_hit.schema.json",
+  "title": "SearchHit",
+  "description": "Resultado normalizado de la interfaz comun de recuperacion. Cierra RF-01 y RF-12. El score viaja SIEMPRE con su semantica: prohibido comparar una distancia con una similitud.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rank",
+    "record_id",
+    "product_id",
+    "title",
+    "brand",
+    "native_score",
+    "score_kind",
+    "higher_is_better"
+  ],
+  "properties": {
+    "rank": {
+      "type": "integer",
+      "description": "Posicion en el ranking, consecutiva desde 1.",
+      "minimum": 1
+    },
+    "record_id": { "type": "string", "minLength": 1 },
+    "product_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "brand": { "type": "string" },
+    "color": { "type": "string" },
+    "native_score": {
+      "type": "number",
+      "description": "Valor tal y como lo devuelve el motor, sin transformar."
+    },
+    "score_kind": {
+      "description": "Que significa native_score. Se declara siempre.",
+      "enum": ["similarity", "distance", "relevance", "unknown"]
+    },
+    "higher_is_better": {
+      "type": "boolean",
+      "description": "Direccion de la ordenacion implicada por score_kind."
+    }
+  }
+}

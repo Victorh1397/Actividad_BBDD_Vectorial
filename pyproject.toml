@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aurum-market"
+version = "1.0.0"
+description = "Aurum Market: búsqueda semántica y control de catálogo sobre una base de datos vectorial"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "jsonschema>=4.26,<5",
+    "numpy>=2.0,<3",
+    "pandas>=2.2,<4",
+    "python-dotenv>=1.1,<2",
+    "pyyaml>=6,<7",
+    "qdrant-client>=1.18,<1.19",
+    "scikit-learn>=1.5,<2",
+    "sentence-transformers>=5.2,<6",
+    "typer>=0.15,<1",
+]
+
+[project.optional-dependencies]
+# Solo para regenerar las figuras del informe. El recorrido evaluado no lo necesita.
+report = ["plotly>=6.2,<7"]
+
+[project.scripts]
+aurum = "aurum_market.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4,<10",
+    "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aurum_market"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+    "integration: necesita Qdrant levantado con `make up`",
+    "slow: recorre el catálogo completo o descarga un modelo",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.format]
+quote-style = "double"

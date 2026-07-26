@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurum-market.local/contracts/resultados_duplicados.schema.json",
+  "title": "resultados_duplicados.csv",
+  "description": "Decision de duplicado por alta ciega. Cierra RF-17 y RF-25.",
+  "type": "array",
+  "minItems": 14,
+  "maxItems": 14,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["incoming_id", "predicted_duplicate", "matched_product_id", "score"],
+    "properties": {
+      "incoming_id": {
+        "type": "string",
+        "description": "ID de altas_evaluacion.csv.",
+        "pattern": "^EVAL-DUP-[0-9]{3}$"
+      },
+      "predicted_duplicate": {
+        "type": "boolean",
+        "description": "Decision de la regla calibrada en desarrollo."
+      },
+      "matched_product_id": {
+        "type": "string",
+        "description": "Producto propuesto como duplicado. Cadena vacia si la prediccion es negativa."
+      },
+      "score": {
+        "type": "number",
+        "description": "Score del mejor candidato, utilizado para tomar la decision."
+      }
+    },
+    "allOf": [
+      {
+        "description": "Una prediccion positiva SIEMPRE senala un product_id concreto (punto 5 de 'Antes de entregar').",
+        "if": {
+          "properties": { "predicted_duplicate": { "const": true } },
+          "required": ["predicted_duplicate"]
+        },
+        "then": {
+          "properties": { "matched_product_id": { "minLength": 1 } }
+        }
+      },
+      {
+        "description": "Una prediccion negativa no propone candidato.",
+        "if": {
+          "properties": { "predicted_duplicate": { "const": false } },
+          "required": ["predicted_duplicate"]
+        },
+        "then": {
+          "properties": { "matched_product_id": { "const": "" } }
+        }
+      }
+    ]
+  }
+}

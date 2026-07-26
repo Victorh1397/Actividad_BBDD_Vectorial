@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurum-market.local/contracts/resultados_busqueda.schema.json",
+  "title": "resultados_busqueda.csv",
+  "description": "Top-10 por consulta ciega. Cierra RF-25. El fichero se serializa como CSV; este esquema valida la lista de filas ya parseadas.",
+  "type": "array",
+  "minItems": 120,
+  "maxItems": 120,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["evaluation_id", "rank", "product_id", "score"],
+    "properties": {
+      "evaluation_id": {
+        "type": "string",
+        "description": "ID de consultas_evaluacion.csv.",
+        "pattern": "^EVAL-[0-9]+-(context|direct|semantic)$"
+      },
+      "rank": {
+        "type": "integer",
+        "description": "Posicion entera de 1 a 10, consecutiva y sin huecos.",
+        "minimum": 1,
+        "maximum": 10
+      },
+      "product_id": {
+        "type": "string",
+        "description": "Producto recuperado. No puede repetirse dentro de una misma consulta.",
+        "minLength": 1
+      },
+      "score": {
+        "type": "number",
+        "description": "Score nativo del motor. Con COSINE es una similitud en [-1, 1] donde mas alto es mejor."
+      }
+    }
+  }
+}
