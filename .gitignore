@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Aurum Market -------------------------------------------------------------
+# Caché de embeddings y salidas intermedias de experimentos: son regenerables y
+# pesan demasiado para el repositorio. Los artefactos de entrega en resultados/
+# SÍ se versionan.
+.artifacts/
+
+# Datos reservados a la corrección: nunca deben llegar al repositorio.
+datos/profesorado/
+
+# Volúmenes locales del motor vectorial.
+qdrant_storage/
+.qdrant/
