@@ -1,0 +1,13 @@
+evaluation_id,query_text,query_type
+EVAL-100455-context,taladro sin cable de 24 voltios que venga con su batería,context
+EVAL-100455-direct,taladro 24v batería,direct
+EVAL-100455-semantic,quiero una herramienta inalámbrica potente para perforar sin depender de un enchufe,semantic
+EVAL-101352-context,"tele de tamaño reducido para una cocina, alrededor de 28 pulgadas",context
+EVAL-101352-direct,television 28 pulgadas,direct
+EVAL-101352-semantic,busco un televisor pequeño de unas setenta centímetros para la cocina,semantic
+EVAL-93437-context,me duele la espalda al trabajar y necesito una silla con buen apoyo lumbar,context
+EVAL-93437-direct,sillas oficina ergonomicas,direct
+EVAL-93437-semantic,necesito un asiento cómodo para trabajar ocho horas con buen apoyo para la espalda,semantic
+EVAL-96202-context,pieza para sujetar un aire acondicionado en el hueco de la ventana,context
+EVAL-96202-direct,soporte aire acondicionado ventana,direct
+EVAL-96202-semantic,cómo puedo fijar el aparato de aire en la ventana para que no se caiga,semantic

@@ -1,0 +1,5 @@
+workload_id,query_text,filter_field,filter_operator,filter_value,expected_property
+FILTER-001,herramienta inalámbrica para perforar,brand,equals,Einhell,todos los resultados pertenecen a la marca indicada
+FILTER-002,tableta ligera para estudiar y tomar apuntes,brand,equals,Apple,todos los resultados pertenecen a la marca indicada
+FILTER-003,zapatillas cómodas para salir a correr,brand,equals,NIKE,todos los resultados pertenecen a la marca indicada
+FILTER-004,monitor para trabajar con varias ventanas,brand,equals,SAMSUNG,todos los resultados pertenecen a la marca indicada
