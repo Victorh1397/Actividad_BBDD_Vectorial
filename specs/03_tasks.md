@@ -28,18 +28,20 @@ evidencia observable.
 | T-012 | Contratos JSON | RF-25 | `specs/contracts/*.json` | `test_artifacts_validate_against_contracts` | `[x]` |
 | T-013 | Plan técnico | — | `specs/02_plan.md` | revisión | `[x]` |
 | T-014 | Tablero de tareas | — | `specs/03_tasks.md` | este fichero | `[x]` |
-| T-015 | ADR-001..004 | — | `specs/decisiones/` | revisión | `[ ]` |
+| T-015 | ADR-001..004 | — | `specs/decisiones/` | revisión | `[x]` |
 
 ## Fase 2 · Datos y contratos
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-020 | Dataclasses `CatalogRecord`, `SearchHit`, `CatalogEvent`, `DuplicateDecision` | RF-01, RF-12 | `contracts.py` | `test_search_hit_contract` | `[ ]` |
-| T-021 | Carga validada de los 8 CSV contra `manifest.json` | RF-07 | `data.py` | `test_manifest_counts_match` | `[ ]` |
-| T-022 | Saneado uniforme de nulos | RF-03 | `data.py` | `test_missing_values_never_render_as_nan` | `[ ]` |
-| T-023 | Verificar contrato UUIDv5 del `record_id` | RF-07 | `data.py` | `test_record_id_follows_uuid5_contract` | `[ ]` |
-| T-024 | Resolver `workload_id` ↔ `query_id` ↔ `product_id` en qrels | RF-19 | `data.py` | `test_qrels_join_has_no_orphans` | `[ ]` |
-| T-025 | Perfiles `sample` / `full` | — | `data.py` | `test_profiles_load_expected_counts` | `[ ]` |
+| T-020 | Dataclasses del dominio con invariantes forzadas | RF-01, RF-12, RF-17 | `contracts.py` | `test_contracts.py` (39 tests) | `[x]` |
+| T-021 | Carga validada del catálogo contra `manifest.json` | RF-07 | `data.py` | `test_manifest_counts_match_the_statement` | `[x]` |
+| T-022 | Saneado uniforme de nulos | RF-03 | `data.py` | `test_missing_values_never_render_as_nan` | `[x]` |
+| T-023 | Verificar contrato UUIDv5 del `record_id` | RF-07 | `data.py` | `test_record_id_follows_the_uuid5_contract` | `[x]` |
+| T-024 | Resolver `workload_id` ↔ `query_id` ↔ `product_id` en qrels | RF-19 | `data.py` | `test_qrels_join_has_no_orphans` | `[x]` |
+| T-025 | Perfiles `sample` / `full` | — | `data.py` | `test_sample_profile_loads_the_expected_count` | `[x]` |
+| T-026 | Carga de workloads, altas y eventos de catálogo | RF-16, RF-17, RF-19 | `data.py` | `test_workloads.py` (25 tests) | `[x]` |
+| T-027 | Modelar el `DELETE` como operación sobre un ID | RF-16 | `contracts.py` | `test_a_deletion_operates_on_an_id_alone` | `[x]` |
 
 ## Fase 3 · Representación y baseline
 
