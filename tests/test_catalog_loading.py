@@ -45,7 +45,9 @@ class TestIdContract:
 
     def test_the_contract_is_deterministic(self) -> None:
         assert expected_record_id("B0818K237B") == expected_record_id("B0818K237B")
-        assert expected_record_id("B0818K237B") == "000bd6e8-a995-56d0-ba03-559885ccef39"
+        assert (
+            expected_record_id("B0818K237B") == "000bd6e8-a995-56d0-ba03-559885ccef39"
+        )
 
     def test_different_products_get_different_ids(self) -> None:
         assert expected_record_id("B0818K237B") != expected_record_id("B086YX9RK5")

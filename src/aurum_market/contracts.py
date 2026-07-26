@@ -125,29 +125,59 @@ class SearchHit:
 class CatalogEvent:
     """One ordered catalog mutation.
 
-    The CSV only distinguishes ``UPSERT`` from ``DELETE``. Whether an upsert is
-    an insertion or an update depends on the state of the collection, so that
-    classification belongs to the applier, not to the file (RF-16).
+    A deletion carries no product sheet: the source file ships only the IDs,
+    because removing something does not require describing it. Modelling that
+    asymmetry here means the applier cannot accidentally index an empty record.
+
+    The file only distinguishes ``UPSERT`` from ``DELETE``. Whether an upsert
+    inserts or updates depends on the live collection, so that classification
+    belongs to the applier, not to this type (RF-16).
     """
 
     sequence: int
     event_id: str
     operation: EventOperation
-    record: CatalogRecord
+    record_id: str
+    product_id: str
+    record: CatalogRecord | None = None
 
     def __post_init__(self) -> None:
         if self.sequence < 1:
             raise ContractError(f"sequence debe ser >= 1, recibido {self.sequence}")
         if self.operation not in ("UPSERT", "DELETE"):
             raise ContractError(f"operación desconocida: {self.operation!r}")
+        if not UUID_PATTERN.match(self.record_id):
+            raise ContractError(
+                f"{self.event_id}: record_id {self.record_id!r} no cumple el "
+                "contrato UUIDv5"
+            )
+        if not self.product_id:
+            raise ContractError(f"{self.event_id}: product_id no puede estar vacío")
+        if self.operation == "UPSERT" and self.record is None:
+            raise ContractError(
+                f"{self.event_id}: un UPSERT necesita la ficha completa del producto"
+            )
+        if self.operation == "DELETE" and self.record is not None:
+            raise ContractError(
+                f"{self.event_id}: un DELETE opera sobre un ID, no sobre una ficha"
+            )
+        if self.record is not None and self.record.record_id != self.record_id:
+            raise ContractError(
+                f"{self.event_id}: la ficha describe {self.record.record_id} "
+                f"pero el evento apunta a {self.record_id}"
+            )
 
     @property
-    def record_id(self) -> str:
-        return self.record.record_id
+    def is_deletion(self) -> bool:
+        return self.operation == "DELETE"
 
-    @property
-    def product_id(self) -> str:
-        return self.record.product_id
+    def require_record(self) -> CatalogRecord:
+        """Return the sheet, failing loudly if the operation has none."""
+        if self.record is None:
+            raise ContractError(
+                f"{self.event_id}: la operación {self.operation} no aporta ficha"
+            )
+        return self.record
 
 
 @dataclass(frozen=True, slots=True)

@@ -151,28 +151,57 @@ class TestSearchHit:
             make_hit(rank=rank)
 
 
+def make_event(**overrides: object) -> CatalogEvent:
+    defaults: dict[str, object] = {
+        "sequence": 1,
+        "event_id": "EVT-001",
+        "operation": "UPSERT",
+        "record_id": VALID_UUID,
+        "product_id": "B0818K237B",
+        "record": make_record(),
+    }
+    return CatalogEvent(**(defaults | overrides))  # type: ignore[arg-type]
+
+
 class TestCatalogEvent:
-    def test_exposes_the_identifiers_of_its_record(self) -> None:
-        event = CatalogEvent(
-            sequence=1, event_id="EVT-001", operation="UPSERT", record=make_record()
-        )
-        assert event.record_id == VALID_UUID
+    def test_an_upsert_carries_the_full_product_sheet(self) -> None:
+        event = make_event()
+        assert event.is_deletion is False
+        assert event.require_record().title == "Vestido largo de fiesta"
+
+    def test_a_deletion_operates_on_an_id_alone(self) -> None:
+        """El fichero no describe lo que borra: solo lo identifica."""
+        event = make_event(operation="DELETE", record=None)
+        assert event.is_deletion is True
+        assert event.record is None
         assert event.product_id == "B0818K237B"
+
+    def test_an_upsert_without_a_sheet_cannot_be_built(self) -> None:
+        with pytest.raises(ContractError, match="ficha completa"):
+            make_event(operation="UPSERT", record=None)
+
+    def test_a_deletion_with_a_sheet_cannot_be_built(self) -> None:
+        with pytest.raises(ContractError, match="opera sobre un ID"):
+            make_event(operation="DELETE")
+
+    def test_asking_a_deletion_for_its_sheet_fails_loudly(self) -> None:
+        event = make_event(operation="DELETE", record=None)
+        with pytest.raises(ContractError, match="no aporta ficha"):
+            event.require_record()
+
+    def test_the_sheet_must_describe_the_very_same_record(self) -> None:
+        """Una ficha desalineada mutaría un producto distinto del previsto."""
+        other = "0037a9df-8492-508f-8167-c09624801216"
+        with pytest.raises(ContractError, match="pero el evento apunta a"):
+            make_event(record_id=other, product_id="B086YX9RK5")
 
     def test_rejects_unknown_operations(self) -> None:
         with pytest.raises(ContractError, match="operación desconocida"):
-            CatalogEvent(
-                sequence=1,
-                event_id="EVT-001",
-                operation="MERGE",  # type: ignore[arg-type]
-                record=make_record(),
-            )
+            make_event(operation="MERGE")
 
     def test_sequence_starts_at_one(self) -> None:
         with pytest.raises(ContractError, match="sequence"):
-            CatalogEvent(
-                sequence=0, event_id="EVT-001", operation="DELETE", record=make_record()
-            )
+            make_event(sequence=0)
 
 
 class TestIncomingListing:
