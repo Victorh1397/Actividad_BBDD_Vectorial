@@ -306,9 +306,50 @@ Los siete puntos del enunciado, cada uno con el test que lo cierra:
 
 ## 4. Estado de los requisitos
 
+Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
+está escrito". `parcial` significa que parte del criterio de aceptación ya está
+cubierta con evidencia y el resto depende de una fase posterior.
+
+**Última actualización:** cierre de la Fase 2 · 141 tests en verde.
+
 | RF | Estado | Evidencia |
 |---|---|---|
-| RF-01 … RF-29 | `pendiente` | — |
+| RF-01 | `parcial` | `SearchHit` validado contra `search_hit.schema.json` en `test_contracts.py`. Falta la función `search()` (Fase 5). |
+| RF-02 | `pendiente` | — |
+| RF-03 | `parcial` | Saneado cerrado: `clean_scalar` es el único punto que decide, con 9 casos en `test_data_integrity.py`, y las 44 marcas / 549 colores ausentes de la muestra verificados en `test_catalog_loading.py`. Falta la composición del texto (Fase 3). |
+| RF-04 | `pendiente` | — |
+| RF-05 | `parcial` | Razonado en [02_plan.md](02_plan.md) §3. Falta llevarlo al informe. |
+| RF-06 | `pendiente` | — |
+| RF-07 | `parcial` | Contrato UUIDv5 verificado sobre las 1.500 filas, unicidad de IDs y payload uniforme (`test_catalog_loading.py`). Falta el esquema de la colección en Qdrant (Fase 4). |
+| RF-08 | `pendiente` | Parámetros declarados en `.env.example` y `config.py`; falta aplicarlos y medirlos. |
+| RF-09 … RF-11 | `pendiente` | — |
+| RF-12 | `parcial` | Garantizado por construcción: `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`. Falta propagarlo hasta el artefacto (Fase 8). |
+| RF-13 … RF-15 | `pendiente` | — |
+| RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID y no sobre una ficha (`test_workloads.py`). Falta aplicarlos (Fase 6). |
+| RF-17 | `parcial` | `DuplicateDecision` hace imposible construir un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 7). |
+| RF-18 | `parcial` | `cleanup_authorized` exige permiso **y** nombre exacto del recurso; higiene del repositorio verificada en `test_safety.py`. Falta el comando `aurum reset` (Fase 4). |
+| RF-19 | `parcial` | Qrels unidos sin huérfanos (248 juicios / 8 consultas), escala ESCI contrastada contra el enunciado y umbral declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md). Faltan las métricas (Fase 3). |
+| RF-20 … RF-24 | `pendiente` | — |
+| RF-25 | `parcial` | Los seis contratos JSON existen y `resultados_duplicados` ya valida filas reales. Falta escribir los artefactos (Fase 8). |
+| RF-26 | `pendiente` | — |
+| RF-27 | `parcial` | 141 tests cubren IDs, saneado, contratos y seguridad operativa. Faltan batching, filtros y mutaciones. |
+| RF-28 … RF-29 | `pendiente` | — |
 
-> Esta tabla se actualiza al cerrar cada requisito. Un RF solo pasa a `cerrado`
-> cuando existe evidencia ejecutable, no cuando "el código está escrito".
+### Hallazgos que la implementación reveló
+
+La Fase 2 destapó tres cosas que la especificación no había anticipado. Quedan
+registradas aquí porque cambian decisiones posteriores:
+
+1. **Un `DELETE` no lleva ficha.** Los ocho eventos de borrado traen solo
+   `record_id`, `product_id`, `locale`, `catalog_version` y `active=False`.
+   `CatalogEvent` se rediseñó para que `record` sea opcional: modelar la
+   asimetría impide que el aplicador indexe una ficha vacía por accidente.
+2. **La distinción alta / actualización no está en los datos.** El fichero solo
+   dice `UPSERT` o `DELETE`; los 16 upserts son 8 altas y 8 actualizaciones
+   según exista o no el `record_id` en la colección. Esa clasificación es
+   responsabilidad del aplicador, y RF-16 la exige explícitamente.
+3. **Recall@10 tiene un techo estructural de ~0,40.** Hay unos 25 productos
+   relevantes por consulta con umbral ≥ 2 y solo diez posiciones disponibles.
+   Un Recall@10 de 0,35 está cerca del máximo alcanzable, no es un mal
+   resultado. Debe explicarse en el informe para que la cifra no se
+   malinterprete al compararla con nDCG@10.
