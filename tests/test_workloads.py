@@ -195,19 +195,81 @@ class TestCatalogEvents:
             load_catalog_events(data_directory=tmp_path)
 
 
-class TestEventsOverlapWithDuplicates:
-    def test_events_mutate_the_products_used_as_duplicate_references(self) -> None:
-        """La trampa documentada en ADR-001, blindada con un test.
+class TestAssumptionsBehindTheExecutionOrder:
+    """Los supuestos de [ADR-001], blindados con tests.
 
-        Si este test dejara de pasar, el orden canónico de ejecución habría
-        dejado de importar y ADR-001 tendría que revisarse.
-        """
+    Si alguno de estos dejara de pasar, el orden canónico de ejecución habría
+    dejado de estar justificado y el ADR tendría que revisarse otra vez.
+    """
+
+    def test_events_target_the_duplicate_reference_products(self) -> None:
+        """Las 7 referencias de desarrollo están todas tocadas por eventos."""
         mutated = {event.product_id for event in load_catalog_events()}
         references = {
             listing.reference_product_id
             for listing in load_incoming_listings("desarrollo")
             if listing.reference_product_id
         }
-        assert references & mutated, (
-            "ADR-001 asume que los eventos tocan los productos de referencia"
+        assert references <= mutated, (
+            "ADR-001 se apoya en que los eventos tocan TODAS las referencias"
         )
+
+    def test_development_references_are_updated_never_deleted(self) -> None:
+        """La asimetría clave: en desarrollo se actualizan, no se borran.
+
+        Si se borraran, no habría forma de calibrar el umbral con casos
+        positivos: el candidato no existiría.
+        """
+        deleted = {
+            event.product_id for event in load_catalog_events() if event.is_deletion
+        }
+        references = {
+            listing.reference_product_id
+            for listing in load_incoming_listings("desarrollo")
+            if listing.reference_product_id
+        }
+        assert not (references & deleted)
+
+    def test_judgments_ignore_the_products_that_events_add(self) -> None:
+        """El argumento central de ADR-001.
+
+        Los AURUM-NEW-* no figuran en ningún juicio de relevancia, así que las
+        métricas de ranking se calculan sobre el catálogo base y los eventos no
+        pertenecen al recorrido de medición.
+        """
+        judged = {
+            product_id
+            for items in load_relevance_judgments().values()
+            for product_id in items
+        }
+        added = {
+            event.product_id
+            for event in load_catalog_events()
+            if not event.is_deletion and event.product_id.startswith("AURUM-NEW")
+        }
+        assert len(added) == 8, "se esperaban 8 altas sintéticas en los eventos"
+        assert not (judged & added)
+
+    @pytest.mark.slow
+    def test_every_judged_product_exists_in_the_base_catalog(self) -> None:
+        """248 juicios, cero huérfanos: la verdad de referencia es el catálogo base."""
+        from aurum_market.data import load_catalog
+
+        catalog = load_catalog("full")
+        judged = {
+            product_id
+            for items in load_relevance_judgments().values()
+            for product_id in items
+        }
+        assert judged <= set(catalog.by_product_id)
+
+    @pytest.mark.slow
+    def test_deletions_remove_products_that_really_exist(self) -> None:
+        """Una baja sobre un producto inexistente no probaría nada."""
+        from aurum_market.data import load_catalog
+
+        catalog = load_catalog("full")
+        deleted = {
+            event.product_id for event in load_catalog_events() if event.is_deletion
+        }
+        assert deleted <= set(catalog.by_product_id)

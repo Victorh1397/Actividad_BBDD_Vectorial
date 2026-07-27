@@ -133,33 +133,48 @@ valor final, no la herencia.
 
 ## 5. Orden canónico de ejecución · ADR-001
 
-**Este orden es obligatorio y no puede alterarse entre desarrollo y evaluación.**
+**Este orden es obligatorio.** Las tres pruebas parten del mismo estado y los
+eventos van al final, porque son los únicos que modifican la colección.
 
 ```
-1. ingest        catálogo base (sample o full)
-2. verify        recuento + estado de indexación
-3. experiment    representación, con oráculo exacto
-4. duplicates calibrate    umbral sobre altas_desarrollo.csv  →  congela config/final.yaml
-5. events        aplica los 24 eventos + mide visibilidad
-6. evaluate      métricas, fidelidad ANN, latencia
-7. duplicates predict      altas_evaluacion.csv con el umbral congelado
-8. deliver       artefactos
+1. ingest                     catálogo completo
+2. verify                     recuento + estado de indexación
+3. experiment                 representación, con oráculo exacto
+4. duplicates calibrate       umbral sobre altas_desarrollo.csv → congela config/final.yaml
+5. evaluate                   nDCG/Recall/MRR, fidelidad ANN, latencia
+6. duplicates predict         altas_evaluacion.csv con el umbral congelado
+7. deliver                    los tres artefactos
+8. events --apply --verify    prueba operativa aislada: idempotencia y visibilidad
 ```
 
-**Por qué importa** (y es la trampa fina de esta actividad): `eventos_catalogo.csv`
-hace `UPSERT` sobre `B000G3T55M`, `B07NV4L2W5`, `B00BEFAR80`, `B076HKFZ8N`,
-`B07JYHSK27`… que son **exactamente** los `reference_product_id` de
-`altas_desarrollo.csv`. Tras los eventos, esos títulos llevan el sufijo
-"- ficha revisada" y su `catalog_version` pasa a 2, así que **el score entre una
-alta entrante y su duplicado cambia**.
+**Por qué importa** (y es la trampa fina de esta actividad): los 24 eventos están
+construidos para tocar exactamente los productos que las otras dos pruebas usan
+como respuesta correcta.
 
-Consecuencia: si se calibra el umbral antes de los eventos y se predice después
-(o al contrario), la regla se evalúa contra una distribución de scores distinta
-de la que se usó para calibrarla. El paso 4 va antes del 5 y el paso 7 después,
-de forma deliberada y documentada: **la calibración se hace sobre el catálogo
-base y la predicción sobre el catálogo post-eventos**, que es el estado real en
-el que operaría el sistema. La sensibilidad de esta decisión se reporta en el
-informe.
+| Grupo de eventos | A quién afecta |
+|---|---|
+| 8 `UPSERT` de fichas existentes | **7 de 7** referencias de `altas_desarrollo.csv` |
+| 8 `DELETE` | **6 de 7** referencias de `altas_evaluacion.csv` |
+| 8 `UPSERT` nuevos (`AURUM-NEW-*`) | Ninguna métrica: no figuran en los juicios de relevancia |
+
+Aplicarlos antes de predecir duplicados **borraría seis de los siete candidatos**,
+haciendo imposible que la base vectorial los genere y, con ello, que una
+predicción positiva señale su `product_id` como exige el enunciado. Aplicarlos
+antes de medir el ranking introduciría productos que los 248 juicios de
+relevancia desconocen.
+
+Los `AURUM-NEW-*` no están para puntuar: sus títulos responden a consultas
+conocidas (`AURUM-NEW-001` "Taladro inalámbrico compacto 24 V con dos baterías"
+frente a `EVAL-100455-direct` "taladro 24v batería") para que la visibilidad de
+un alta pueda comprobarse con una **búsqueda semántica real** y no solo con una
+lectura por ID.
+
+**Consecuencia operativa:** el paso 8 modifica la colección de forma
+irreversible, así que repetir el recorrido completo exige reingerir desde cero.
+`aurum deliver` cubre los pasos 1 a 7 y nunca aplica eventos.
+
+La justificación completa, con las citas del enunciado que la sostienen, está en
+[ADR-001](decisiones/ADR-001-orden-canonico-de-ejecucion.md).
 
 ---
 

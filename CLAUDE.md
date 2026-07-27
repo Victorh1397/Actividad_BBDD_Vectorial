@@ -59,10 +59,14 @@ Cosas que ya han costado tiempo una vez:
   `core.autocrlf=true`, git reescribiría los CSV con CRLF y sus checksums SHA-256
   dejarían de coincidir con `datos/manifest.json` en cualquier clon, incluido el
   del corrector.
-- **Orden canónico de ejecución.** `eventos_catalogo.csv` hace UPSERT sobre los
-  mismos `product_id` que son referencia en `altas_desarrollo.csv`, así que el
-  orden calibrar → eventos → predecir cambia los scores. Está fijado en
+- **Orden canónico de ejecución.** Los 24 eventos están construidos para tocar
+  los productos que las otras pruebas usan como respuesta correcta: los 8
+  `DELETE` borran 6 de las 7 referencias de `altas_evaluacion.csv`. Aplicarlos
+  antes de predecir duplicados hace imposible señalar el candidato. Van **al
+  final**, después de `aurum deliver`. Fijado en
   [ADR-001](specs/decisiones/ADR-001-orden-canonico-de-ejecucion.md) y no se altera.
+- **Los eventos son irreversibles.** Tras aplicarlos, repetir el recorrido de
+  medición exige reingerir el catálogo desde cero.
 - **Un umbral calibrado se congela** en `config/final.yaml` antes de tocar
   cualquier conjunto de evaluación (P-04).
 - **Qdrant tiene que estar corriendo** para cualquier operación sobre la
