@@ -353,3 +353,11 @@ registradas aquí porque cambian decisiones posteriores:
    Un Recall@10 de 0,35 está cerca del máximo alcanzable, no es un mal
    resultado. Debe explicarse en el informe para que la cifra no se
    malinterprete al compararla con nDCG@10.
+4. **Los eventos no pertenecen al recorrido de medición.** Los 24 eventos están
+   construidos para tocar los productos que las otras pruebas usan como
+   respuesta correcta: los 8 `DELETE` borran **6 de las 7** referencias de
+   `altas_evaluacion.csv`, y ninguno de los 8 `AURUM-NEW-*` que añaden figura en
+   los 248 juicios de relevancia. Aplicarlos antes de predecir duplicados haría
+   imposible señalar el candidato, incumpliendo el punto 5 de la checklist de
+   entrega. Esto obligó a **revisar [ADR-001](decisiones/ADR-001-orden-canonico-de-ejecucion.md)**:
+   los eventos pasan a ser el último paso, una prueba operativa aislada.
