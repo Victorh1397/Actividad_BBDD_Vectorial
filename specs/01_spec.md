@@ -348,11 +348,13 @@ registradas aquí porque cambian decisiones posteriores:
    dice `UPSERT` o `DELETE`; los 16 upserts son 8 altas y 8 actualizaciones
    según exista o no el `record_id` en la colección. Esa clasificación es
    responsabilidad del aplicador, y RF-16 la exige explícitamente.
-3. **Recall@10 tiene un techo estructural de ~0,40.** Hay unos 25 productos
-   relevantes por consulta con umbral ≥ 2 y solo diez posiciones disponibles.
-   Un Recall@10 de 0,35 está cerca del máximo alcanzable, no es un mal
-   resultado. Debe explicarse en el informe para que la cifra no se
-   malinterprete al compararla con nDCG@10.
+3. **Recall@10 tiene un techo estructural de 0,519.** Medido, no estimado: hay
+   198 productos relevantes con umbral ≥ 2 repartidos entre 8 consultas y solo
+   diez posiciones disponibles. El techo macro es 0,519 y su dispersión es
+   enorme —de **0,256** en `DEV-28703` (39 relevantes) a **1,000** en
+   `DEV-33633` (4 relevantes)—, así que la media de Recall@10 dice tanto sobre
+   el reparto de los juicios como sobre el sistema. Debe explicarse en el
+   informe, y conviene acompañar el macro con el detalle por consulta.
 4. **Los eventos no pertenecen al recorrido de medición.** Los 24 eventos están
    construidos para tocar los productos que las otras pruebas usan como
    respuesta correcta: los 8 `DELETE` borran **6 de las 7** referencias de
