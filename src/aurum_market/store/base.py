@@ -31,11 +31,22 @@ class ProviderUnavailableError(StoreError):
 
 @runtime_checkable
 class VectorStore(Protocol):
-    """Minimum surface shared by every backend."""
+    """Minimum surface shared by every backend.
+
+    The exact NumPy oracle and Qdrant implement the same three members, which
+    is what lets one retriever and one evaluation path serve both. Any
+    difference in results is then attributable to the index, not to the code
+    around it (RF-20).
+    """
 
     @property
     def size(self) -> int:
-        """Number of indexed vectors."""
+        """Number of stored vectors."""
+        ...
+
+    @property
+    def dimension(self) -> int:
+        """Width of the stored vectors, or 0 when the store is empty."""
         ...
 
     def search_vector(

@@ -406,6 +406,46 @@ def verify(
 
 
 @app.command()
+def search(
+    query: str = typer.Argument(..., help="Consulta en lenguaje natural."),
+    top_k: int = typer.Option(10, "--top-k", "-k", help="Cuántos resultados."),
+    brand: str = typer.Option("", "--brand", "-b", help="Restringe a una marca."),
+) -> None:
+    """Busca en el catálogo. Interfaz común de recuperación (RF-01, RF-13, RF-14)."""
+    from .search import build_live_retriever
+
+    settings = load_settings()
+    try:
+        retriever = build_live_retriever(settings)
+        hits = retriever.search(query, top_k=top_k, brand=brand or None)
+    except Exception as error:
+        typer.secho(f"{type(error).__name__}: {error}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    if not hits:
+        typer.secho(
+            f"Sin resultados para {query!r}"
+            + (f" en la marca {brand!r}" if brand else ""),
+            fg=typer.colors.YELLOW,
+        )
+        return
+
+    typer.echo(f"{'#':>2}  {'score':>7}  {'marca':<22} título")
+    typer.echo("-" * 100)
+    for hit in hits:
+        typer.echo(
+            f"{hit.rank:>2}  {hit.native_score:>7.4f}  {hit.brand[:22]:<22} "
+            f"{hit.title[:60]}"
+        )
+    # El score viaja con su semántica hasta la pantalla (P-03).
+    typer.echo("-" * 100)
+    typer.echo(
+        f"{len(hits)} resultados · score: {hits[0].score_kind}, "
+        f"{'mayor es mejor' if hits[0].higher_is_better else 'menor es mejor'}"
+    )
+
+
+@app.command()
 def reset() -> None:
     """Borra la colección. Destructivo y desactivado por defecto (RF-18)."""
     from .store.qdrant_store import QdrantStore
