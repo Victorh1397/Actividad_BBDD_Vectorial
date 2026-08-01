@@ -67,7 +67,10 @@ class HnswSettings:
 
     m: int = 24
     ef_construct: int = 120
-    ef_search: int = 128
+    # 256, no el 128 heredado de la sesión 03: el barrido midió fidelidad 1,0
+    # frente a 0,9875, y el coste (+3 ms) queda dentro del ruido del transporte.
+    # Ver ADR-007.
+    ef_search: int = 256
     indexing_threshold: int = 1_000
     full_scan_threshold: int = 1_000
 
