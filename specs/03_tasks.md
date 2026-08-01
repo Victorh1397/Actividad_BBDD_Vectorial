@@ -47,13 +47,16 @@ evidencia observable.
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-030 | Estrategias de composición del texto | RF-03, RF-06 | `text.py` | `test_text_strategies` | `[ ]` |
-| T-031 | Encoder E5 con prefijos y L2 | RF-04 | `embeddings.py` | `test_e5_prefixes_and_normalization` | `[ ]` |
-| T-032 | Caché `.npy` con checksum y metadatos | RF-04 | `embeddings.py` | `test_embedding_cache_roundtrip` | `[ ]` |
-| T-033 | Métricas nDCG@10 / Recall@10 / MRR@10 graduadas | RF-19 | `evaluation/metrics.py` | `test_metrics_against_hand_computed_values` | `[ ]` |
-| T-034 | Baseline TF-IDF | RF-02 | `baselines.py` | fila `E0` de `aurum experiment` | `[ ]` |
-| T-035 | Oráculo exacto NumPy | RF-20 | `store/exact_store.py` | `test_exact_store_matches_bruteforce` | `[ ]` |
-| T-036 | Matriz de experimentos E0–E3 | RF-06 | `cli.py`, `evaluation/` | `.artifacts/experiments/*.json` válidos | `[ ]` |
+| T-030 | Estrategias de composición del texto | RF-03, RF-06 | `text.py` | `test_text_and_baseline.py::TestTextStrategies` | `[x]` |
+| T-031 | Encoder E5 con prefijos y L2 | RF-04 | `embeddings.py` | `test_embeddings.py::TestPrefixes` | `[x]` |
+| T-032 | Caché con checksum del texto y metadatos | RF-04 | `embeddings.py` | `test_the_cache_round_trips` | `[x]` |
+| T-033 | Métricas nDCG@10 / Recall@10 / MRR@10 graduadas | RF-19 | `evaluation/metrics.py` | `test_metrics.py` (32 tests, valores a mano) | `[x]` |
+| T-034 | Baseline TF-IDF | RF-02 | `baselines.py` | fila `E0`: nDCG@10 0,6198 | `[x]` |
+| T-035 | Oráculo exacto NumPy | RF-20 | `store/exact_store.py` | `test_text_and_baseline.py::TestExactVectorStore` | `[x]` |
+| T-036 | Matriz de experimentos E0–E3 | RF-06 | `experiments.py`, `cli.py` | `.artifacts/experiments/E{0..3}.json` válidos | `[x]` |
+| T-037 | Interfaz común `Retriever` | RF-01, RF-13 | `search.py` | `test_satisfies_the_retriever_protocol` | `[x]` |
+| T-038 | Techo estructural de Recall@10 | RF-19 | `evaluation/metrics.py` | `test_recall_at_10_has_a_structural_ceiling` | `[x]` |
+| T-039 | ADR-005 y `config/final.yaml` congelado | RF-06, RF-25 | `specs/decisiones/`, `config/` | revisión | `[x]` |
 
 ## Fase 4 · Almacén vectorial e ingesta
 

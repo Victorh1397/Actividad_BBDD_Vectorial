@@ -310,32 +310,52 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 2 · 141 tests en verde.
+**Última actualización:** cierre de la Fase 3 · 254 tests en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
-| RF-01 | `parcial` | `SearchHit` validado contra `search_hit.schema.json` en `test_contracts.py`. Falta la función `search()` (Fase 5). |
-| RF-02 | `pendiente` | — |
-| RF-03 | `parcial` | Saneado cerrado: `clean_scalar` es el único punto que decide, con 9 casos en `test_data_integrity.py`, y las 44 marcas / 549 colores ausentes de la muestra verificados en `test_catalog_loading.py`. Falta la composición del texto (Fase 3). |
-| RF-04 | `pendiente` | — |
-| RF-05 | `parcial` | Razonado en [02_plan.md](02_plan.md) §3. Falta llevarlo al informe. |
-| RF-06 | `pendiente` | — |
-| RF-07 | `parcial` | Contrato UUIDv5 verificado sobre las 1.500 filas, unicidad de IDs y payload uniforme (`test_catalog_loading.py`). Falta el esquema de la colección en Qdrant (Fase 4). |
-| RF-08 | `pendiente` | Parámetros declarados en `.env.example` y `config.py`; falta aplicarlos y medirlos. |
+| RF-01 | `parcial` | `Retriever` es un `Protocol` que cumplen `TfidfRetriever` y `DenseRetriever`, así que la evaluación no puede distinguirlos (`test_experiments.py`). Falta la implementación sobre Qdrant (Fase 5). |
+| RF-02 | **`cerrado`** | Baseline TF-IDF evaluado con las mismas métricas, consultas y texto que el sistema denso: `E0` con nDCG@10 0,6198. Pliega acentos, imprescindible en español. |
+| RF-03 | **`cerrado`** | Tres estrategias implementadas y documentadas en `text.py`; saneado en un único punto con 9 casos en `test_data_integrity.py` y las 44 marcas / 549 colores ausentes verificados. |
+| RF-04 | **`cerrado`** | Prefijos `query:`/`passage:` aplicados solo a modelos E5, idempotentes; vectores L2 y `float32` verificados contra el modelo real (`test_embeddings.py`). |
+| RF-05 | `parcial` | Razonado en [02_plan.md](02_plan.md) §3 y comprobado en código: `ExactVectorStore` rechaza vectores sin normalizar porque el producto interno dejaría de ser el coseno. Falta llevarlo al informe. |
+| RF-06 | **`cerrado`** | Cuatro configuraciones que aíslan una variable cada una, con análisis en [ADR-005](decisiones/ADR-005-modelo-de-embeddings.md). Artefactos en `.artifacts/experiments/E{0..3}.json`, validados contra su contrato. |
+| RF-07 | `parcial` | Contrato UUIDv5 verificado sobre las 1.500 filas, unicidad y payload uniforme. Falta el esquema de la colección en Qdrant (Fase 4). |
+| RF-08 | `pendiente` | Parámetros declarados en `config/final.yaml`; falta aplicarlos y barrer `ef_search`. |
 | RF-09 … RF-11 | `pendiente` | — |
-| RF-12 | `parcial` | Garantizado por construcción: `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`. Falta propagarlo hasta el artefacto (Fase 8). |
-| RF-13 … RF-15 | `pendiente` | — |
-| RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID y no sobre una ficha (`test_workloads.py`). Falta aplicarlos (Fase 6). |
-| RF-17 | `parcial` | `DuplicateDecision` hace imposible construir un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 7). |
-| RF-18 | `parcial` | `cleanup_authorized` exige permiso **y** nombre exacto del recurso; higiene del repositorio verificada en `test_safety.py`. Falta el comando `aurum reset` (Fase 4). |
-| RF-19 | `parcial` | Qrels unidos sin huérfanos (248 juicios / 8 consultas), escala ESCI contrastada contra el enunciado y umbral declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md). Faltan las métricas (Fase 3). |
-| RF-20 … RF-24 | `pendiente` | — |
-| RF-25 | `parcial` | Los seis contratos JSON existen y `resultados_duplicados` ya valida filas reales. Falta escribir los artefactos (Fase 8). |
+| RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y ambos recuperadores declaran `similarity`. Falta propagarlo al artefacto (Fase 8). |
+| RF-13 | `parcial` | `top_k` configurable y respetado en ambos recuperadores. Falta sobre Qdrant. |
+| RF-14 | `parcial` | El filtro de marca reduce el conjunto de candidatos **antes** de puntuar, nunca después. Falta ejecutarlo en la base de datos (Fase 5). |
+| RF-15 | `parcial` | Colección vacía → `CollectionEmptyError`; filtro sin resultados → lista vacía documentada; dimensión incompatible → error accionable. Falta el caso de motor caído. |
+| RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 6). |
+| RF-17 | `parcial` | `DuplicateDecision` hace imposible un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 7). |
+| RF-18 | `parcial` | `cleanup_authorized` exige permiso **y** nombre exacto; higiene del repositorio verificada. Falta `aurum reset` (Fase 4). |
+| RF-19 | **`cerrado`** | nDCG@10, Recall@10 y MRR@10 graduadas, contrastadas contra valores calculados a mano en `test_metrics.py`. Umbral ≥ 2 declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md) y pasado explícitamente en cada llamada. |
+| RF-20 | `parcial` | El oráculo exacto existe y es la referencia de los cuatro experimentos. Falta comparar sus IDs contra el ANN (Fase 5). |
+| RF-21 … RF-24 | `pendiente` | — |
+| RF-25 | `parcial` | Los seis contratos JSON existen; `experiment_run` ya valida artefactos reales al escribirse. Falta escribir los tres de entrega (Fase 8). |
 | RF-26 | `pendiente` | — |
-| RF-27 | `parcial` | 141 tests cubren IDs, saneado, contratos y seguridad operativa. Faltan batching, filtros y mutaciones. |
+| RF-27 | `parcial` | 254 tests cubren IDs, saneado, contratos, métricas, texto, embeddings y seguridad. Faltan batching, filtros nativos y mutaciones. |
 | RF-28 … RF-29 | `pendiente` | — |
 
-### Hallazgos que la implementación reveló
+### Hallazgos de la Fase 3
+
+5. **La composición del texto pesa más que el modelo.** De E0 a E3 el nDCG@10
+   sube +0,087, repartido así: pasar de léxico a denso aporta +0,023 (26 %),
+   **cambiar qué texto se codifica aporta +0,045 (52 %)** y duplicar el tamaño
+   del modelo aporta +0,019 (22 %). La causa está medida: el campo `text`
+   promedia 1.309 caracteres y el **27,2 %** de los productos supera los 512
+   tokens del modelo, gastando su presupuesto en relleno de palabras clave.
+6. **Adoptar embeddings sin arreglar el texto empeoró el sistema.** `E1` queda
+   por debajo del baseline TF-IDF en Recall (0,283 vs 0,303) y en MRR (0,813 vs
+   0,917). Solo `E3` supera al baseline en las tres métricas.
+7. **El conjunto de desarrollo favorece al baseline léxico.** Sus ocho consultas
+   son todas `customer_query`, literales como *"botines marrones mujer tacon
+   medio"*. Las doce de evaluación sí traen variantes `semantic` y `context`, de
+   modo que la ventaja del sistema denso medida aquí es probablemente un suelo,
+   no un techo. Afirmar lo contrario sería extrapolar.
+
+### Hallazgos de la Fase 2
 
 La Fase 2 destapó tres cosas que la especificación no había anticipado. Quedan
 registradas aquí porque cambian decisiones posteriores:
