@@ -106,19 +106,33 @@ class TestRelevanceJudgments:
             load_relevance_judgments(data_directory=tmp_path)
 
     def test_recall_at_10_has_a_structural_ceiling(self) -> None:
-        """~25 relevantes por consulta y solo 10 posiciones: el techo es ~0,40.
+        """198 relevantes en 8 consultas y solo 10 posiciones: el techo es 0,519.
 
-        No es un defecto del sistema; es aritmética. Conviene tenerlo escrito
-        para no leer un Recall@10 de 0,35 como un mal resultado.
+        No es un defecto del sistema, es aritmética. Fijar el valor medido
+        impide que el informe cite una estimación en vez del dato.
         """
+        from statistics import fmean
+
+        from aurum_market.evaluation.metrics import recall_ceiling_at_k
+
         judgments = load_relevance_judgments()
-        ceilings = [
-            min(10, sum(1 for v in items.values() if v >= RELEVANCE_THRESHOLD))
-            / max(1, sum(1 for v in items.values() if v >= RELEVANCE_THRESHOLD))
+        relevant = sum(
+            1
             for items in judgments.values()
-        ]
-        assert max(ceilings) <= 1.0
-        assert sum(ceilings) / len(ceilings) < 0.6
+            for value in items.values()
+            if value >= RELEVANCE_THRESHOLD
+        )
+        assert relevant == 198
+
+        ceilings = {
+            query_id: recall_ceiling_at_k(items, k=10)
+            for query_id, items in judgments.items()
+        }
+        assert fmean(ceilings.values()) == pytest.approx(0.519, abs=1e-3)
+        # La dispersión importa tanto como la media: el mismo Recall@10 significa
+        # cosas opuestas en la consulta más fácil y en la más difícil.
+        assert min(ceilings.values()) == pytest.approx(10 / 39, abs=1e-3)
+        assert max(ceilings.values()) == pytest.approx(1.0)
 
 
 class TestIncomingListings:

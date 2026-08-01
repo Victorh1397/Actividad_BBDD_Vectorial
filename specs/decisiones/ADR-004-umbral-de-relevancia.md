@@ -55,6 +55,25 @@ métricas binarias.
 - El denominador de Recall@10 es el número de documentos juzgados con
   `relevancia >= 2` para esa consulta. Si una consulta no tuviera ninguno, su
   recall es 0 por definición y se señala en el análisis por consulta.
+- **Recall@10 no puede llegar a 1,0.** Con este umbral hay 198 productos
+  relevantes repartidos entre 8 consultas y solo diez posiciones, así que el
+  techo macro medido es **0,519**. Y varía muchísimo por consulta:
+
+  | Consulta | Relevantes | Techo@10 |
+  |---|---|---|
+  | `DEV-28703` convertibles 2 en 1 | 39 | 0,256 |
+  | `DEV-38249` · `DEV-43240` | 35 | 0,286 |
+  | `DEV-13357` base tapizada | 31 | 0,323 |
+  | `DEV-61533` lentejas sin gluten | 30 | 0,333 |
+  | `DEV-31224` cámaras bridge | 15 | 0,667 |
+  | `DEV-18868` botines marrones | 9 | 1,000 |
+  | `DEV-33633` disfraz halloween | 4 | 1,000 |
+
+  Por eso `QueryMetrics` expone `recall_ceiling` junto a cada valor. Un
+  Recall@10 de 0,25 en `DEV-28703` es el **98 %** del máximo alcanzable —una
+  recuperación casi perfecta—, mientras que ese mismo 0,25 en `DEV-33633`, cuyo
+  techo es 1,0, sería un **25 %**: un resultado mediocre. Reportar solo el macro
+  escondería esa diferencia y llevaría a optimizar lo que no toca.
 - El valor queda congelado: cambiarlo obliga a re-ejecutar **todos** los
   experimentos, no solo el afectado ([P-05](../00_constitution.md)).
 

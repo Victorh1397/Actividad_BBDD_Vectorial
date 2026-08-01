@@ -1,0 +1,57 @@
+# Configuración de la ejecución final · Aurum Market
+#
+# Este fichero es un artefacto de entrega (RF-25): declara exactamente con qué
+# parámetros se produjeron los resultados. Cambiar un valor de aquí invalida los
+# artefactos y obliga a regenerarlos con `aurum deliver`.
+
+schema_version: "1.0"
+
+# --- Representación -----------------------------------------------------------
+# Elegido en ADR-005 tras comparar cuatro configuraciones sobre desarrollo.
+representation:
+  embedding_model: intfloat/multilingual-e5-base
+  dimension: 768
+  text_strategy: title_brand_color
+  normalized: true
+  query_prefix: "query: "
+  document_prefix: "passage: "
+  # Evidencia que sostiene la elección (perfil sample, oráculo exacto):
+  #   E0 tfidf    raw_text           nDCG 0.6198  Recall 0.3031  MRR 0.9167
+  #   E1 e5-small raw_text           nDCG 0.6427  Recall 0.2830  MRR 0.8125
+  #   E2 e5-small title_brand_color  nDCG 0.6881  Recall 0.3277  MRR 0.8542
+  #   E3 e5-base  title_brand_color  nDCG 0.7072  Recall 0.3648  MRR 0.9375
+
+# --- Índice y base de datos ---------------------------------------------------
+# Los parámetros HNSW se justifican y se barren en la Fase 5 (RF-08, RF-20).
+index:
+  engine: qdrant
+  collection: aurum-market-catalogo
+  distance: cosine
+  hnsw:
+    m: 24
+    ef_construct: 120
+    ef_search: 128
+
+# --- Evaluación ---------------------------------------------------------------
+evaluation:
+  top_k: 10
+  # Exact y Substitute cuentan como relevantes; Complement no. Ver ADR-004.
+  relevance_threshold: 2.0
+  relevance_mapping: { E: 3, S: 2, C: 1, I: 0 }
+  # Recall@10 no puede superar este valor con estos juicios: 198 relevantes
+  # repartidos en 8 consultas y solo diez posiciones.
+  recall_ceiling: 0.5188
+
+# --- Ingesta ------------------------------------------------------------------
+ingestion:
+  profile: full
+  batch_size: 256
+
+# --- Duplicados ---------------------------------------------------------------
+# Se calibra en la Fase 7 y se congela aquí antes de tocar altas_evaluacion.csv
+# (P-04). Hasta entonces queda declarado como pendiente, no con un valor
+# provisional que pudiera colarse en una ejecución.
+duplicates:
+  threshold: null
+  margin: null
+  calibrated_on: null
