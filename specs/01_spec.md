@@ -310,35 +310,63 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 4 · 255 tests + 29 de integración en verde.
+**Última actualización:** cierre de la Fase 5 · 303 tests en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
-| RF-01 | `parcial` | `Retriever` es un `Protocol` que cumplen `TfidfRetriever` y `DenseRetriever`, así que la evaluación no puede distinguirlos (`test_experiments.py`). Falta la implementación sobre Qdrant (Fase 5). |
+| RF-01 | **`cerrado`** | `Retriever` es un `Protocol` que cumplen TF-IDF, el oráculo exacto y Qdrant indistintamente; `aurum search` expone la interfaz con `product_id`, posición, título, metadatos y score con su semántica. |
 | RF-02 | **`cerrado`** | Baseline TF-IDF evaluado con las mismas métricas, consultas y texto que el sistema denso: `E0` con nDCG@10 0,6198. Pliega acentos, imprescindible en español. |
 | RF-03 | **`cerrado`** | Tres estrategias implementadas y documentadas en `text.py`; saneado en un único punto con 9 casos en `test_data_integrity.py` y las 44 marcas / 549 colores ausentes verificados. |
 | RF-04 | **`cerrado`** | Prefijos `query:`/`passage:` aplicados solo a modelos E5, idempotentes; vectores L2 y `float32` verificados contra el modelo real (`test_embeddings.py`). |
 | RF-05 | `parcial` | Razonado en [02_plan.md](02_plan.md) §3 y comprobado en código: `ExactVectorStore` rechaza vectores sin normalizar porque el producto interno dejaría de ser el coseno. Falta llevarlo al informe. |
 | RF-06 | **`cerrado`** | Cuatro configuraciones que aíslan una variable cada una, con análisis en [ADR-005](decisiones/ADR-005-modelo-de-embeddings.md). Artefactos en `.artifacts/experiments/E{0..3}.json`, validados contra su contrato. |
 | RF-07 | **`cerrado`** | Colección verificada en vivo: 15.000 puntos, dimensión 768, distancia `Cosine`, ID = `record_id`, payload uniforme con índice `KEYWORD` sobre `brand`. |
-| RF-08 | `parcial` | `m=24` y `ef_construct=120` **leídos de vuelta del motor**, no asumidos, y umbrales de indexación explícitos ([ADR-006](decisiones/ADR-006-umbrales-de-indexacion.md)). Falta el barrido de `ef_search` (Fase 5). |
+| RF-08 | **`cerrado`** | `m=24` y `ef_construct=120` **leídos de vuelta del motor**, umbrales de indexación explícitos ([ADR-006](decisiones/ADR-006-umbrales-de-indexacion.md)) y barrido de `ef_search` sobre el catálogo completo: 0,85 → 1,00 de fidelidad entre 16 y 256 ([ADR-007](decisiones/ADR-007-ef-search.md)). |
 | RF-09 | **`cerrado`** | Segunda ingesta sobre el perfil `sample`: `variación del recuento: +0`. Cubierto además por `test_double_ingest_keeps_count`. *(Punto 1 de la checklist)* |
 | RF-10 | **`cerrado`** | `aurum verify` exige recuento, dimensión y distancia, y reporta `indexed_vectors_count`: 15.000 de 15.000 en 4 segmentos. |
 | RF-11 | **`cerrado`** | Verificado destruyendo el contenedor (`docker compose down` → `Removed`) y recreándolo: los 15.000 puntos y su índice sobreviven en el volumen. |
 | RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y los tres backends declaran `similarity`. Falta propagarlo al artefacto (Fase 8). |
-| RF-13 | `parcial` | `top_k` configurable y respetado en los tres backends. Falta exponerlo en la interfaz común sobre Qdrant. |
-| RF-14 | `parcial` | Índice `KEYWORD` sobre `brand` creado, y el filtro viaja como `Filter/FieldCondition` dentro de la consulta (`test_filtered_search_never_leaks_another_brand`). Falta ejecutarlo sobre las 4 consultas reales (Fase 5). |
+| RF-13 | **`cerrado`** | `top_k` configurable en los tres backends y en `aurum search`. |
+| RF-14 | **`cerrado`** | El filtro viaja como `Filter/FieldCondition` dentro de la consulta, con índice `KEYWORD` sobre `brand`. Las 4 consultas reales devuelven **10/10** de la marca pedida, sin intrusos. *(Punto 2 de la checklist)* |
 | RF-15 | **`cerrado`** | Colección inexistente o vacía → `CollectionEmptyError` con instrucción; filtro sin resultados → lista vacía documentada; motor caído → `ProviderUnavailableError` que nombra la URL y sugiere `make up`. |
 | RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 6). |
 | RF-17 | `parcial` | `DuplicateDecision` hace imposible un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 7). |
 | RF-18 | **`cerrado`** | `aurum reset` exige `AURUM_ALLOW_RESET` **y** `AURUM_CONFIRM_CLEANUP` con el nombre exacto —probado en vivo: sin ambas, se bloquea y explica qué falta—, y ningún recurso fuera del prefijo `aurum-market` es alcanzable. |
 | RF-19 | **`cerrado`** | nDCG@10, Recall@10 y MRR@10 graduadas, contrastadas contra valores calculados a mano en `test_metrics.py`. Umbral ≥ 2 declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md) y pasado explícitamente en cada llamada. |
-| RF-20 | `parcial` | El oráculo exacto existe y es la referencia de los cuatro experimentos. Falta comparar sus IDs contra el ANN (Fase 5). |
-| RF-21 … RF-24 | `pendiente` | — |
+| RF-20 | **`cerrado`** | Fidelidad **1,0000** con orden idéntico sobre el catálogo completo: el índice no pierde ni un candidato frente al oráculo. Cualquier fallo de ranking queda por tanto atribuido a la representación. |
+| RF-21 | **`cerrado`** | p50 y p95 con calentamiento y repeticiones declarados, separando codificación (0,50 ms) de recorrido completo (81,77 ms), y con el entorno adjunto en `.artifacts/evaluation.json`. |
+| RF-22 | **`cerrado`** | Las 4 consultas filtradas: 10/10 de la marca en todas. |
+| RF-23 … RF-24 | `pendiente` | — |
 | RF-25 | `parcial` | Los seis contratos JSON existen; `experiment_run` ya valida artefactos reales al escribirse. Falta escribir los tres de entrega (Fase 8). |
 | RF-26 | `pendiente` | — |
 | RF-27 | `parcial` | 254 tests cubren IDs, saneado, contratos, métricas, texto, embeddings y seguridad. Faltan batching, filtros nativos y mutaciones. |
 | RF-28 … RF-29 | `pendiente` | — |
+
+### Hallazgos de la Fase 5
+
+11. **El sistema se degrada con las consultas semánticas.** Con *"taladro 24v
+    batería"* devuelve taladros; con *"quiero una herramienta inalámbrica
+    potente para perforar sin depender de un enchufe"* devuelve guantes y
+    estantes de cocina. **El oráculo exacto falla igual**, así que es un fallo
+    de **representación**, no del índice. El enunciado plantea las tres
+    formulaciones de cada consulta *"para comprobar si el comportamiento se
+    mantiene cuando cambia la superficie léxica"*: la respuesta medida es que
+    no se mantiene. Probablemente el texto `title_brand_color` (140 caracteres)
+    deja al modelo sin contexto para conectar *"perforar"* con *"taladro"*.
+    La decisión **no se revisa**: hacerlo mirando el conjunto de evaluación
+    violaría [P-04](00_constitution.md). Va al informe como principal
+    recomendación de mejora.
+12. **A esta escala el índice ANN no compensa.** El oráculo por fuerza bruta en
+    NumPy (18,43 ms) es más rápido que Qdrant (40,74 ms) sobre los mismos
+    15.000 vectores. HNSW empieza a rentar con órdenes de magnitud más datos.
+13. **La latencia medida está dominada por el transporte.** Una operación que
+    no busca nada tarda 32,64 ms contra Docker Desktop sobre WSL2, así que de
+    los ~81 ms del recorrido completo la búsqueda propiamente dicha son unos
+    8 ms. Por eso subir `ef_search` de 16 a 256 apenas cuesta 3 ms y compra
+    fidelidad perfecta ([ADR-007](decisiones/ADR-007-ef-search.md)).
+14. **Las cifras de la muestra eran optimistas, como se advirtió.** nDCG@10 cae
+    de 0,7072 sobre 1.500 productos a 0,5422 sobre 15.000: diez veces más
+    distractores compitiendo por las mismas diez posiciones.
 
 ### Hallazgos de la Fase 4
 
