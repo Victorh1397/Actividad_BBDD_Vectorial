@@ -167,8 +167,6 @@ def verify_collection(
     return status
 
 
-def embed_queries(
-    encoder: Encoder, texts: Sequence[str]
-) -> np.ndarray:
+def embed_queries(encoder: Encoder, texts: Sequence[str]) -> np.ndarray:
     """Encode query texts with the ``query:`` role."""
     return encoder.encode(list(texts), role="query").vectors

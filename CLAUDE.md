@@ -67,6 +67,16 @@ Cosas que ya han costado tiempo una vez:
   [ADR-001](specs/decisiones/ADR-001-orden-canonico-de-ejecucion.md) y no se altera.
 - **Los eventos son irreversibles.** Tras aplicarlos, repetir el recorrido de
   medición exige reingerir el catálogo desde cero.
+- **Qdrant puede responder sin usar su índice.** Los umbrales
+  `indexing_threshold` y `full_scan_threshold` están en **kilobytes** y se
+  aplican **por segmento**, no por colección. Con los valores por defecto la
+  colección contesta por fuerza bruta y `m`/`ef_construct` no intervienen. Antes
+  de medir fidelidad ANN o latencia, comprueba `indexed_vectors_count` con
+  `aurum verify`. Ver [ADR-006](specs/decisiones/ADR-006-umbrales-de-indexacion.md).
+- **`green` no significa indexado.** Qdrant almacena y responde `green` de
+  inmediato, y construye el grafo después. Usa
+  `wait_until_indexed(require_indexed=True)` cuando la medición dependa del
+  índice.
 - **Un umbral calibrado se congela** en `config/final.yaml` antes de tocar
   cualquier conjunto de evaluación (P-04).
 - **Qdrant tiene que estar corriendo** para cualquier operación sobre la

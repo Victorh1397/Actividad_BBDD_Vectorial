@@ -52,12 +52,17 @@ class ConfigurationError(RuntimeError):
 class HnswSettings:
     """Graph parameters declared explicitly so the final run is auditable (RF-08).
 
-    ``indexing_threshold`` and ``full_scan_threshold`` are not cosmetic. Qdrant
-    defaults both to 10.000 because below that size a linear scan beats walking
-    a graph, so a collection of 15.000 products split across segments may never
-    build an HNSW index at all. That would leave ``m`` and ``ef_construct``
-    without observable effect and make ANN fidelity trivially 1.0 — measuring
-    an index that is not being used. Lowering them forces the index to exist.
+    ``indexing_threshold`` and ``full_scan_threshold`` are **in kilobytes, not
+    in number of vectors** — a detail that is easy to misread and expensive to
+    miss. Below that size Qdrant answers by brute force, because walking a graph
+    over a small segment is slower than scanning it.
+
+    It matters here: the 1.500-product sample takes 4.500 KB at 768 dimensions
+    but only 2.250 KB at 384, and Qdrant's default threshold is 20.000 KB. With
+    the defaults the sample would never build an index, leaving ``m`` and
+    ``ef_construct`` without observable effect and making ANN fidelity trivially
+    1.0 — measuring an index that is not in use. Lowering the thresholds forces
+    it to exist. The full 15.000-product catalog exceeds the default anyway.
     """
 
     m: int = 24

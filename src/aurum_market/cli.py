@@ -382,13 +382,25 @@ def verify(
     _line(OK, f"Colección {store.collection}")
     _line(OK, f"{status.points_count} puntos (esperados {expected})")
     _line(OK, f"dimensión {status.dimension} · distancia {status.distance}")
+    # Leído del motor, no de nuestra configuración: declarar y aplicar son
+    # cosas distintas, y RF-08 pide comprobar la segunda.
+    _line(
+        OK,
+        f"HNSW aplicado: m={status.hnsw_m}, ef_construct={status.hnsw_ef_construct}",
+    )
     if status.fully_indexed:
-        _line(OK, f"{status.indexed_vectors_count} vectores indexados")
+        _line(
+            OK,
+            f"{status.indexed_vectors_count} vectores indexados en "
+            f"{status.segments_count} segmentos",
+        )
     else:
         _line(
             WARN,
             f"{status.indexed_vectors_count} de {status.points_count} indexados",
-            "Qdrant deja segmentos pequeños sin indexar; afecta a la latencia",
+            f"~{status.kilobytes_per_segment:.0f} KB por segmento frente al umbral "
+            f"de {status.indexing_threshold} KB. Por debajo, Qdrant responde por "
+            "fuerza bruta y el grafo HNSW no interviene",
         )
     typer.secho("La colección puede aceptar consultas.", fg=typer.colors.GREEN)
 

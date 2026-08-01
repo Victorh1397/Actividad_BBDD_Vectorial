@@ -26,7 +26,12 @@ from .base import CollectionEmptyError, ProviderUnavailableError, StoreError
 
 @dataclass(frozen=True, slots=True)
 class CollectionStatus:
-    """What the engine reports about the collection right now."""
+    """What the engine reports about the collection right now.
+
+    The HNSW fields are read back from Qdrant rather than assumed: declaring a
+    configuration and verifying that the engine applied it are different things,
+    and RF-08 asks for the second (P-06).
+    """
 
     exists: bool
     points_count: int
@@ -34,6 +39,11 @@ class CollectionStatus:
     dimension: int | None = None
     distance: str = ""
     status: str = ""
+    segments_count: int = 0
+    hnsw_m: int | None = None
+    hnsw_ef_construct: int | None = None
+    full_scan_threshold: int | None = None
+    indexing_threshold: int | None = None
 
     @property
     def fully_indexed(self) -> bool:
@@ -44,6 +54,18 @@ class CollectionStatus:
         latency measurement (RF-10).
         """
         return self.exists and self.indexed_vectors_count >= self.points_count
+
+    @property
+    def kilobytes_per_segment(self) -> float:
+        """Approximate segment size, which is what the thresholds compare against.
+
+        Qdrant decides whether to build the graph per segment, not per
+        collection, so a collection can sit above the threshold in total and
+        still be answered by brute force.
+        """
+        if not self.dimension or self.segments_count < 1:
+            return 0.0
+        return self.points_count * self.dimension * 4 / 1024 / self.segments_count
 
 
 class QdrantStore:
@@ -79,9 +101,13 @@ class QdrantStore:
         """Report counts and indexing state without raising on absence."""
         self.health()
         if not self._client.collection_exists(self.collection):
-            return CollectionStatus(exists=False, points_count=0, indexed_vectors_count=0)
+            return CollectionStatus(
+                exists=False, points_count=0, indexed_vectors_count=0
+            )
         info = self._client.get_collection(self.collection)
         params = info.config.params.vectors
+        hnsw = info.config.hnsw_config
+        optimizers = info.config.optimizer_config
         return CollectionStatus(
             exists=True,
             points_count=int(info.points_count or 0),
@@ -89,6 +115,11 @@ class QdrantStore:
             dimension=int(getattr(params, "size", 0)) or None,
             distance=str(getattr(params, "distance", "")),
             status=str(info.status),
+            segments_count=int(info.segments_count or 0),
+            hnsw_m=getattr(hnsw, "m", None),
+            hnsw_ef_construct=getattr(hnsw, "ef_construct", None),
+            full_scan_threshold=getattr(hnsw, "full_scan_threshold", None),
+            indexing_threshold=getattr(optimizers, "indexing_threshold", None),
         )
 
     @property
@@ -130,10 +161,8 @@ class QdrantStore:
             hnsw_config=models.HnswConfigDiff(
                 m=hnsw.m,
                 ef_construct=hnsw.ef_construct,
-                # Por defecto Qdrant hace escaneo lineal por debajo de 10.000
-                # vectores por segmento. Con 15.000 productos el índice podría
-                # no llegar a construirse nunca, dejando m y ef_construct sin
-                # efecto y la fidelidad ANN trivialmente en 1,0.
+                # En KILOBYTES, no en número de vectores. Por debajo de este
+                # tamaño Qdrant responde por fuerza bruta aunque exista grafo.
                 full_scan_threshold=hnsw.full_scan_threshold,
             ),
             optimizers_config=models.OptimizersConfigDiff(
@@ -163,9 +192,7 @@ class QdrantStore:
 
     # ------------------------------------------------------------- escritura
 
-    def upsert_batch(
-        self, records: Sequence[CatalogRecord], vectors: ArrayLike
-    ) -> int:
+    def upsert_batch(self, records: Sequence[CatalogRecord], vectors: ArrayLike) -> int:
         """Write one batch, keyed by ``record_id``. Returns how many were sent."""
         matrix = np.ascontiguousarray(vectors, dtype=np.float32)
         if len(records) != matrix.shape[0]:
@@ -185,9 +212,7 @@ class QdrantStore:
             )
             for position, record in enumerate(records)
         ]
-        self._client.upsert(
-            collection_name=self.collection, points=points, wait=True
-        )
+        self._client.upsert(collection_name=self.collection, points=points, wait=True)
         return len(points)
 
     def delete_by_record_ids(self, record_ids: Iterable[str]) -> int:
@@ -282,28 +307,46 @@ class QdrantStore:
     # ------------------------------------------------------------- espera
 
     def wait_until_indexed(
-        self, *, expected_points: int, timeout_seconds: float = 120.0
+        self,
+        *,
+        expected_points: int,
+        timeout_seconds: float = 120.0,
+        require_indexed: bool = False,
     ) -> CollectionStatus:
-        """Poll until the collection holds and indexes what it should.
+        """Poll until the collection holds —and optionally indexes— what it should.
 
         A confirmed write must become observable, and if it does not the system
         must say so instead of carrying on (P-10). Adapted from ``wait_until``
         of session 03.
+
+        ``require_indexed`` matters because Qdrant reports ``green`` as soon as
+        the points are stored and builds the HNSW graph afterwards, in the
+        background. Waiting only for ``green`` therefore proves the data is
+        there but says nothing about whether the index exists — and a latency
+        measured before the graph is built is measuring a brute-force scan.
         """
         if timeout_seconds <= 0:
             raise StoreError("El plazo de espera debe ser positivo")
         started = monotonic()
-        status = self.status()
         while True:
             status = self.status()
             elapsed = monotonic() - started
-            if status.points_count >= expected_points and status.status == "green":
+            stored = status.points_count >= expected_points and status.status == "green"
+            indexed = (
+                not require_indexed or status.indexed_vectors_count >= expected_points
+            )
+            if stored and indexed:
                 return status
             if elapsed >= timeout_seconds:
+                pending = (
+                    "El índice no ha terminado de construirse"
+                    if stored
+                    else "La escritura no se ha vuelto observable"
+                )
                 raise StoreError(
                     f"Tras {elapsed:.1f}s la colección tiene "
                     f"{status.points_count} puntos (esperados {expected_points}), "
                     f"{status.indexed_vectors_count} indexados y estado "
-                    f"{status.status!r}. La escritura no se ha vuelto observable."
+                    f"{status.status!r}. {pending}."
                 )
             sleep(0.5)
