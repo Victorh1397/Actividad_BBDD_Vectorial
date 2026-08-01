@@ -270,6 +270,166 @@ def experiment(
     typer.echo(comparison_table(results))
 
 
+def _load_final_config() -> dict:
+    """Read config/final.yaml, the frozen configuration of the final run."""
+    import yaml
+
+    path = PROJECT_ROOT / "config" / "final.yaml"
+    if not path.is_file():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+@app.command()
+def ingest(
+    profile: str = typer.Option(
+        "full", "--profile", help="Perfil de catálogo: sample (1.500) o full (15.000)."
+    ),
+    batch_size: int = typer.Option(0, "--batch-size", help="0 usa el valor del .env."),
+) -> None:
+    """Ingiere el catálogo en Qdrant, por lotes e idempotente (RF-09, RF-10).
+
+    Repetirla no aumenta el recuento: cada producto se escribe bajo su UUIDv5.
+    """
+    from .data import load_catalog
+    from .embeddings import Encoder
+    from .ingest import ingest_catalog
+    from .store.qdrant_store import QdrantStore
+
+    if profile not in ("sample", "full"):
+        typer.secho(f"Perfil desconocido: {profile!r}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    try:
+        settings = load_settings()
+    except ConfigurationError as error:
+        typer.secho(str(error), fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    final = _load_final_config()
+    strategy = final.get("representation", {}).get("text_strategy", "title_brand_color")
+
+    typer.echo(f"Cargando el catálogo ({profile})…")
+    catalog = load_catalog(profile)  # type: ignore[arg-type]
+    typer.echo(
+        f"{len(catalog)} productos · modelo {settings.embedding_model} · "
+        f"texto {strategy}\n"
+    )
+
+    store = QdrantStore(settings)
+    encoder = Encoder(settings.embedding_model, batch_size=64)
+
+    before = store.status()
+    if before.exists:
+        typer.echo(f"La colección ya existe con {before.points_count} puntos.")
+
+    with typer.progressbar(length=len(catalog), label="ingiriendo") as bar:
+        seen = 0
+
+        def advance(sent: int, _total: int) -> None:
+            nonlocal seen
+            bar.update(sent - seen)
+            seen = sent
+
+        try:
+            report = ingest_catalog(
+                catalog,
+                store,
+                encoder,
+                text_strategy=strategy,
+                batch_size=batch_size or settings.batch_size,
+                show_progress=True,
+                on_batch=advance,
+            )
+        except Exception as error:
+            typer.secho(f"\n{type(error).__name__}: {error}", fg=typer.colors.RED)
+            raise typer.Exit(code=1) from error
+
+    typer.echo("")
+    typer.echo(f"lotes enviados      : {report.batches}")
+    typer.echo(f"puntos en la colección: {report.points_count}")
+    typer.echo(f"vectores indexados  : {report.status.indexed_vectors_count}")
+    typer.echo(f"dimensión           : {report.dimension}")
+    if before.exists:
+        delta = report.points_count - before.points_count
+        typer.echo(f"variación del recuento: {delta:+d}")
+    typer.secho("Ingesta completada.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def verify(
+    profile: str = typer.Option("full", "--profile", help="Perfil esperado."),
+) -> None:
+    """Comprueba recuento, dimensión y estado antes de aceptar consultas (RF-10)."""
+    from .data import CATALOG_PROFILES, load_manifest
+    from .ingest import verify_collection
+    from .store.qdrant_store import QdrantStore
+
+    settings = load_settings()
+    expected = dict(load_manifest()["counts"])[CATALOG_PROFILES[profile][1]]
+    store = QdrantStore(settings)
+
+    try:
+        status = verify_collection(
+            store,
+            expected_points=int(expected),
+            expected_dimension=settings.embedding_dimension,
+        )
+    except Exception as error:
+        typer.secho(f"[ FALLO] {error}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    _line(OK, f"Colección {store.collection}")
+    _line(OK, f"{status.points_count} puntos (esperados {expected})")
+    _line(OK, f"dimensión {status.dimension} · distancia {status.distance}")
+    # Leído del motor, no de nuestra configuración: declarar y aplicar son
+    # cosas distintas, y RF-08 pide comprobar la segunda.
+    _line(
+        OK,
+        f"HNSW aplicado: m={status.hnsw_m}, ef_construct={status.hnsw_ef_construct}",
+    )
+    if status.fully_indexed:
+        _line(
+            OK,
+            f"{status.indexed_vectors_count} vectores indexados en "
+            f"{status.segments_count} segmentos",
+        )
+    else:
+        _line(
+            WARN,
+            f"{status.indexed_vectors_count} de {status.points_count} indexados",
+            f"~{status.kilobytes_per_segment:.0f} KB por segmento frente al umbral "
+            f"de {status.indexing_threshold} KB. Por debajo, Qdrant responde por "
+            "fuerza bruta y el grafo HNSW no interviene",
+        )
+    typer.secho("La colección puede aceptar consultas.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def reset() -> None:
+    """Borra la colección. Destructivo y desactivado por defecto (RF-18)."""
+    from .store.qdrant_store import QdrantStore
+
+    settings = load_settings()
+    store = QdrantStore(settings)
+
+    if not settings.cleanup_authorized(store.collection):
+        typer.secho(
+            f"Operación bloqueada sobre {store.collection!r}.", fg=typer.colors.RED
+        )
+        typer.echo("Requiere las DOS condiciones en el .env:")
+        typer.echo("  AURUM_ALLOW_RESET=true")
+        typer.echo(f"  AURUM_CONFIRM_CLEANUP={store.collection}")
+        raise typer.Exit(code=1)
+
+    status = store.status()
+    store.reset()
+    typer.secho(
+        f"Colección {store.collection} eliminada ({status.points_count} puntos).",
+        fg=typer.colors.YELLOW,
+    )
+
+
 @app.command()
 def version() -> None:
     """Muestra la versión del paquete y la ruta del proyecto."""

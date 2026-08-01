@@ -310,7 +310,7 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 3 · 254 tests en verde.
+**Última actualización:** cierre de la Fase 4 · 255 tests + 29 de integración en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
@@ -320,16 +320,18 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-04 | **`cerrado`** | Prefijos `query:`/`passage:` aplicados solo a modelos E5, idempotentes; vectores L2 y `float32` verificados contra el modelo real (`test_embeddings.py`). |
 | RF-05 | `parcial` | Razonado en [02_plan.md](02_plan.md) §3 y comprobado en código: `ExactVectorStore` rechaza vectores sin normalizar porque el producto interno dejaría de ser el coseno. Falta llevarlo al informe. |
 | RF-06 | **`cerrado`** | Cuatro configuraciones que aíslan una variable cada una, con análisis en [ADR-005](decisiones/ADR-005-modelo-de-embeddings.md). Artefactos en `.artifacts/experiments/E{0..3}.json`, validados contra su contrato. |
-| RF-07 | `parcial` | Contrato UUIDv5 verificado sobre las 1.500 filas, unicidad y payload uniforme. Falta el esquema de la colección en Qdrant (Fase 4). |
-| RF-08 | `pendiente` | Parámetros declarados en `config/final.yaml`; falta aplicarlos y barrer `ef_search`. |
-| RF-09 … RF-11 | `pendiente` | — |
-| RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y ambos recuperadores declaran `similarity`. Falta propagarlo al artefacto (Fase 8). |
-| RF-13 | `parcial` | `top_k` configurable y respetado en ambos recuperadores. Falta sobre Qdrant. |
-| RF-14 | `parcial` | El filtro de marca reduce el conjunto de candidatos **antes** de puntuar, nunca después. Falta ejecutarlo en la base de datos (Fase 5). |
-| RF-15 | `parcial` | Colección vacía → `CollectionEmptyError`; filtro sin resultados → lista vacía documentada; dimensión incompatible → error accionable. Falta el caso de motor caído. |
+| RF-07 | **`cerrado`** | Colección verificada en vivo: 15.000 puntos, dimensión 768, distancia `Cosine`, ID = `record_id`, payload uniforme con índice `KEYWORD` sobre `brand`. |
+| RF-08 | `parcial` | `m=24` y `ef_construct=120` **leídos de vuelta del motor**, no asumidos, y umbrales de indexación explícitos ([ADR-006](decisiones/ADR-006-umbrales-de-indexacion.md)). Falta el barrido de `ef_search` (Fase 5). |
+| RF-09 | **`cerrado`** | Segunda ingesta sobre el perfil `sample`: `variación del recuento: +0`. Cubierto además por `test_double_ingest_keeps_count`. *(Punto 1 de la checklist)* |
+| RF-10 | **`cerrado`** | `aurum verify` exige recuento, dimensión y distancia, y reporta `indexed_vectors_count`: 15.000 de 15.000 en 4 segmentos. |
+| RF-11 | **`cerrado`** | Verificado destruyendo el contenedor (`docker compose down` → `Removed`) y recreándolo: los 15.000 puntos y su índice sobreviven en el volumen. |
+| RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y los tres backends declaran `similarity`. Falta propagarlo al artefacto (Fase 8). |
+| RF-13 | `parcial` | `top_k` configurable y respetado en los tres backends. Falta exponerlo en la interfaz común sobre Qdrant. |
+| RF-14 | `parcial` | Índice `KEYWORD` sobre `brand` creado, y el filtro viaja como `Filter/FieldCondition` dentro de la consulta (`test_filtered_search_never_leaks_another_brand`). Falta ejecutarlo sobre las 4 consultas reales (Fase 5). |
+| RF-15 | **`cerrado`** | Colección inexistente o vacía → `CollectionEmptyError` con instrucción; filtro sin resultados → lista vacía documentada; motor caído → `ProviderUnavailableError` que nombra la URL y sugiere `make up`. |
 | RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 6). |
 | RF-17 | `parcial` | `DuplicateDecision` hace imposible un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 7). |
-| RF-18 | `parcial` | `cleanup_authorized` exige permiso **y** nombre exacto; higiene del repositorio verificada. Falta `aurum reset` (Fase 4). |
+| RF-18 | **`cerrado`** | `aurum reset` exige `AURUM_ALLOW_RESET` **y** `AURUM_CONFIRM_CLEANUP` con el nombre exacto —probado en vivo: sin ambas, se bloquea y explica qué falta—, y ningún recurso fuera del prefijo `aurum-market` es alcanzable. |
 | RF-19 | **`cerrado`** | nDCG@10, Recall@10 y MRR@10 graduadas, contrastadas contra valores calculados a mano en `test_metrics.py`. Umbral ≥ 2 declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md) y pasado explícitamente en cada llamada. |
 | RF-20 | `parcial` | El oráculo exacto existe y es la referencia de los cuatro experimentos. Falta comparar sus IDs contra el ANN (Fase 5). |
 | RF-21 … RF-24 | `pendiente` | — |
@@ -337,6 +339,23 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-26 | `pendiente` | — |
 | RF-27 | `parcial` | 254 tests cubren IDs, saneado, contratos, métricas, texto, embeddings y seguridad. Faltan batching, filtros nativos y mutaciones. |
 | RF-28 … RF-29 | `pendiente` | — |
+
+### Hallazgos de la Fase 4
+
+8. **Una colección puede responder sin usar su índice.** Tras la primera
+   ingesta, Qdrant informaba `points_count=1500`, `status=green` e
+   `indexed_vectors_count=0`: contestaba por fuerza bruta con el grafo HNSW sin
+   construir. Los umbrales que lo deciden están **en kilobytes y por segmento**,
+   no en número de vectores. Sin corregirlo, RF-08 sería decoración, RF-20
+   saldría trivialmente 1,0 y RF-21 mediría un escaneo lineal. Ver
+   [ADR-006](decisiones/ADR-006-umbrales-de-indexacion.md).
+9. **`green` no significa indexado.** Qdrant confirma la escritura de inmediato
+   y construye el grafo después, en segundo plano. Cualquier medición que
+   dependa del índice debe esperar a `indexed_vectors_count`, no a `status`.
+10. **La verificación tiene que leer del motor, no de la configuración.**
+    Declarar `m=24` y comprobar que Qdrant lo aplicó son cosas distintas, y el
+    enunciado pide la segunda. `aurum verify` muestra los valores tal y como
+    los reporta el motor.
 
 ### Hallazgos de la Fase 3
 

@@ -50,11 +50,26 @@ class ConfigurationError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class HnswSettings:
-    """Graph parameters declared explicitly so the final run is auditable (RF-08)."""
+    """Graph parameters declared explicitly so the final run is auditable (RF-08).
+
+    ``indexing_threshold`` and ``full_scan_threshold`` are **in kilobytes, not
+    in number of vectors** — a detail that is easy to misread and expensive to
+    miss. Below that size Qdrant answers by brute force, because walking a graph
+    over a small segment is slower than scanning it.
+
+    It matters here: the 1.500-product sample takes 4.500 KB at 768 dimensions
+    but only 2.250 KB at 384, and Qdrant's default threshold is 20.000 KB. With
+    the defaults the sample would never build an index, leaving ``m`` and
+    ``ef_construct`` without observable effect and making ANN fidelity trivially
+    1.0 — measuring an index that is not in use. Lowering the thresholds forces
+    it to exist. The full 15.000-product catalog exceeds the default anyway.
+    """
 
     m: int = 24
     ef_construct: int = 120
     ef_search: int = 128
+    indexing_threshold: int = 1_000
+    full_scan_threshold: int = 1_000
 
     def __post_init__(self) -> None:
         if self.m < 2:
@@ -63,12 +78,18 @@ class HnswSettings:
             raise ConfigurationError("AURUM_HNSW_EF_CONSTRUCT debe ser >= 4")
         if self.ef_search < 1:
             raise ConfigurationError("AURUM_HNSW_EF_SEARCH debe ser >= 1")
+        if self.indexing_threshold < 0:
+            raise ConfigurationError("AURUM_INDEXING_THRESHOLD no puede ser negativo")
+        if self.full_scan_threshold < 0:
+            raise ConfigurationError("AURUM_FULL_SCAN_THRESHOLD no puede ser negativo")
 
     def as_dict(self) -> dict[str, int]:
         return {
             "m": self.m,
             "ef_construct": self.ef_construct,
             "ef_search": self.ef_search,
+            "indexing_threshold": self.indexing_threshold,
+            "full_scan_threshold": self.full_scan_threshold,
         }
 
 
@@ -176,5 +197,7 @@ def load_settings(*, env_file: Path | None = None) -> Settings:
             m=_read_int("AURUM_HNSW_M", 24),
             ef_construct=_read_int("AURUM_HNSW_EF_CONSTRUCT", 120),
             ef_search=_read_int("AURUM_HNSW_EF_SEARCH", 128),
+            indexing_threshold=_read_int("AURUM_INDEXING_THRESHOLD", 1_000),
+            full_scan_threshold=_read_int("AURUM_FULL_SCAN_THRESHOLD", 1_000),
         ),
     )

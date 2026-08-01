@@ -62,11 +62,14 @@ evidencia observable.
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-040 | `Protocol VectorStore` + excepciones propias | RF-01, RF-15 | `store/base.py` | `test_edge_cases` | `[ ]` |
-| T-041 | Colección Qdrant: esquema, HNSW, payload index | RF-07, RF-08 | `store/qdrant_store.py` | `test_collection_schema` | `[ ]` |
-| T-042 | Ingesta por lotes con `upsert` sobre `record_id` | RF-09 | `ingest.py` | **`test_double_ingest_keeps_count`** | `[ ]` |
-| T-043 | Verificación de recuento e indexación con espera acotada | RF-10 | `ingest.py` | `aurum verify` | `[ ]` |
-| T-044 | `validate_resource_name` + `reset` con doble confirmación | RF-18 | `store/qdrant_store.py` | **`test_cleanup_is_disabled_by_default`** | `[ ]` |
+| T-040 | `Protocol VectorStore` + excepciones propias | RF-01, RF-15 | `store/base.py` | `test_searching_a_missing_collection_fails_loudly` | `[x]` |
+| T-041 | Colección Qdrant: esquema, HNSW, payload index | RF-07, RF-08 | `store/qdrant_store.py` | `test_collection_schema_is_explicit` | `[x]` |
+| T-042 | Ingesta por lotes con `upsert` sobre `record_id` | RF-09 | `ingest.py` | **`test_double_ingest_keeps_count`** | `[x]` |
+| T-043 | Verificación de recuento e indexación con espera acotada | RF-10 | `ingest.py`, `cli.py` | `aurum verify` + `test_waiting_gives_up_with_an_explanation` | `[x]` |
+| T-044 | `validate_resource_name` + `reset` con doble confirmación | RF-18 | `store/qdrant_store.py` | **`test_reset_is_blocked_by_default`** | `[x]` |
+| T-045 | Umbrales de indexación explícitos | RF-08, RF-20 | `config.py`, `store/qdrant_store.py` | `test_the_index_is_actually_built` | `[x]` |
+| T-046 | Leer la configuración HNSW de vuelta desde el motor | RF-08 | `store/qdrant_store.py` | `test_the_declared_hnsw_configuration_is_applied` | `[x]` |
+| T-047 | ADR-006 sobre los umbrales | RF-08 | `specs/decisiones/` | revisión | `[x]` |
 
 ## Fase 5 · Recuperación y filtros
 

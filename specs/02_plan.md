@@ -129,6 +129,27 @@ Los valores de partida son los de la sesión 03, para que la comparación con lo
 trabajado en clase sea directa. El barrido de `hnsw_ef` es lo que justifica el
 valor final, no la herencia.
 
+### El índice tiene que existir para poder configurarlo
+
+Declarar `m` y `ef_construct` no basta: Qdrant **puede responder sin construir
+el grafo**. Dos umbrales lo deciden, y ambos están en **kilobytes por segmento**,
+no en número de vectores:
+
+| Parámetro | Por defecto | Nuestro valor |
+|---|---|---|
+| `optimizers_config.indexing_threshold` | 20.000 KB | **1.000 KB** |
+| `hnsw_config.full_scan_threshold` | 10.000 KB | **1.000 KB** |
+
+Con los valores por defecto la muestra de 1.500 productos —4.500 KB en tres
+segmentos— nunca se indexaría, y la colección contestaría por fuerza bruta
+mientras informa `status: green`. Eso dejaría a `m` y `ef_construct` sin efecto
+observable, la fidelidad ANN saldría trivialmente 1,0 y la latencia describiría
+un escaneo lineal.
+
+Por eso `aurum verify` lee la configuración **de vuelta desde el motor** y
+muestra `indexed_vectors_count`: declarar una configuración y comprobar que se
+aplicó son cosas distintas. Ver [ADR-006](decisiones/ADR-006-umbrales-de-indexacion.md).
+
 ---
 
 ## 5. Orden canónico de ejecución · ADR-001

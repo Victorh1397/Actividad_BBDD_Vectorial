@@ -31,6 +31,11 @@ index:
     m: 24
     ef_construct: 120
     ef_search: 128
+  # En KILOBYTES y por segmento, no por colección. Con los valores por defecto
+  # (20.000) la muestra nunca construiría el grafo y Qdrant respondería por
+  # fuerza bruta, dejando m y ef_construct sin efecto observable. Ver ADR-006.
+  indexing_threshold_kb: 1000
+  full_scan_threshold_kb: 1000
 
 # --- Evaluación ---------------------------------------------------------------
 evaluation:
