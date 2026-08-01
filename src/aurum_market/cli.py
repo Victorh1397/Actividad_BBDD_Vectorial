@@ -177,6 +177,100 @@ def doctor(
 
 
 @app.command()
+def experiment(
+    profile: str = typer.Option(
+        "sample",
+        "--profile",
+        help="Perfil de catálogo: sample (1.500) o full (15.000).",
+    ),
+    top_k: int = typer.Option(10, "--top-k", help="Profundidad del ranking."),
+    only: str = typer.Option(
+        "", "--only", help="Ejecuta solo estos experimentos, separados por comas."
+    ),
+) -> None:
+    """Compara representaciones sobre el conjunto de desarrollo (RF-06).
+
+    Todos los experimentos usan el oráculo exacto, nunca un índice ANN: así una
+    diferencia solo puede venir de la representación. La pérdida del índice se
+    mide aparte.
+    """
+    from .data import (
+        load_catalog,
+        load_development_queries,
+        load_relevance_judgments,
+    )
+    from .experiments import (
+        build_matrix,
+        comparison_table,
+        run_experiment,
+        write_result,
+    )
+
+    if profile not in ("sample", "full"):
+        typer.secho(f"Perfil desconocido: {profile!r}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Cargando el catálogo ({profile})…")
+    catalog = load_catalog(profile)  # type: ignore[arg-type]
+    queries = load_development_queries()
+    judgments = load_relevance_judgments()
+    typer.echo(
+        f"{len(catalog)} productos · {len(queries)} consultas · "
+        f"{sum(len(v) for v in judgments.values())} juicios\n"
+    )
+
+    selected = {item.strip().upper() for item in only.split(",") if item.strip()}
+    results = []
+    winner_strategy = None
+
+    for config in build_matrix():
+        if selected and config.experiment_id not in selected:
+            continue
+        # E3 hereda la estrategia ganadora: su única variable es el modelo.
+        if config.experiment_id == "E3" and winner_strategy is not None:
+            config = build_matrix(winner_strategy=winner_strategy)[3]
+
+        typer.echo(f"[{config.experiment_id}] {config.description}")
+        try:
+            result = run_experiment(
+                config,
+                catalog.records,
+                queries,
+                judgments,
+                profile=profile,  # type: ignore[arg-type]
+                top_k=top_k,
+                show_progress=True,
+            )
+        except Exception as error:  # el motivo importa más que el traceback
+            typer.secho(
+                f"  falló: {type(error).__name__}: {error}", fg=typer.colors.RED
+            )
+            continue
+
+        path = write_result(result)
+        typer.echo(
+            f"  nDCG@{top_k}={result.report.mean_ndcg:.4f}  "
+            f"Recall@{top_k}={result.report.mean_recall:.4f}  "
+            f"MRR@{top_k}={result.report.mean_mrr:.4f}   → {path.name}\n"
+        )
+        results.append(result)
+
+        if config.experiment_id == "E2" and len(results) >= 2:
+            previous = next(
+                (r for r in results if r.config.experiment_id == "E1"), None
+            )
+            if previous is not None:
+                winner = max((previous, result), key=lambda r: r.report.mean_ndcg)
+                winner_strategy = winner.config.text_strategy
+
+    if not results:
+        typer.secho("No se ejecutó ningún experimento.", fg=typer.colors.YELLOW)
+        raise typer.Exit(code=1)
+
+    typer.echo(comparison_table(results))
+
+
+@app.command()
 def version() -> None:
     """Muestra la versión del paquete y la ruta del proyecto."""
     from . import __version__

@@ -48,11 +48,18 @@
     },
     "metrics": {
       "type": "object",
-      "required": ["ndcg_at_10", "recall_at_10", "mrr_at_10"],
+      "description": "Metricas macro. La profundidad vive en configuration.top_k, no en el nombre del campo: codificarla aqui obligaria a un contrato distinto por cada k.",
+      "required": ["ndcg", "recall", "mrr"],
       "properties": {
-        "ndcg_at_10": { "type": "number", "minimum": 0, "maximum": 1 },
-        "recall_at_10": { "type": "number", "minimum": 0, "maximum": 1 },
-        "mrr_at_10": { "type": "number", "minimum": 0, "maximum": 1 },
+        "ndcg": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recall": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mrr": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recall_ceiling": {
+          "type": "number",
+          "description": "Mejor recall alcanzable con estos juicios y este top_k. Sin el, la media de recall se malinterpreta.",
+          "minimum": 0,
+          "maximum": 1
+        },
         "per_query": {
           "type": "array",
           "description": "Metricas por consulta, para poder explicar la media.",
