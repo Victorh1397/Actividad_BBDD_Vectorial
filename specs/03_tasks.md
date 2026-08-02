@@ -88,28 +88,33 @@ evidencia observable.
 > que se planificaron. Los eventos van **al final** porque sus ocho borrados
 > eliminan seis de las siete referencias de `altas_evaluacion.csv`: aplicarlos
 > antes destruiría el estado base que necesitan los duplicados y los artefactos.
-> Los identificadores `T-0NN` se conservan aunque el orden cambie.
+>
+> Los identificadores se renumeraron para que `T-0X0` siga perteneciendo a la
+> fase X, aprovechando que ninguna de estas tareas se había ejecutado todavía.
+> **A partir de aquí quedan congelados**: si el orden volviera a cambiar, se
+> reordenarían las secciones pero no los IDs, porque los commits ya los citan y
+> un identificador no puede pasar a significar otra cosa.
 
 ## Fase 6 · Duplicados
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-070 | Generación de candidatos top-2 vía base vectorial | RF-17 | `duplicates.py` | `test_candidates_come_from_the_vector_store` | `[ ]` |
-| T-071 | Regla score + margen (+ marca / léxico si aporta) | RF-17 | `duplicates.py` | `test_rule_is_deterministic` | `[ ]` |
-| T-072 | Barrido de umbral sobre desarrollo + precision/recall/F1 | RF-23 | `duplicates.py` | `aurum duplicates calibrate` | `[ ]` |
-| T-073 | Congelar umbral en `config/final.yaml` | RF-17 | `config/final.yaml` | revisión antes de predecir | `[ ]` |
-| T-074 | Análisis separado de FP y FN con coste de negocio | RF-23 | informe | sección del informe | `[ ]` |
-| T-075 | Predicción sobre `altas_evaluacion.csv` | RF-17 | `duplicates.py` | **`test_positive_prediction_names_a_candidate`** | `[ ]` |
+| T-060 | Generación de candidatos top-2 vía base vectorial | RF-17 | `duplicates.py` | `test_candidates_come_from_the_vector_store` | `[ ]` |
+| T-061 | Regla score + margen (+ marca / léxico si aporta) | RF-17 | `duplicates.py` | `test_rule_is_deterministic` | `[ ]` |
+| T-062 | Barrido de umbral sobre desarrollo + precision/recall/F1 | RF-23 | `duplicates.py` | `aurum duplicates calibrate` | `[ ]` |
+| T-063 | Congelar umbral en `config/final.yaml` | RF-17 | `config/final.yaml` | revisión antes de predecir | `[ ]` |
+| T-064 | Análisis separado de FP y FN con coste de negocio | RF-23 | informe | sección del informe | `[ ]` |
+| T-065 | Predicción sobre `altas_evaluacion.csv` | RF-17 | `duplicates.py` | **`test_positive_prediction_names_a_candidate`** | `[ ]` |
 
 ## Fase 7 · Evaluación y artefactos
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-080 | Escritura + validación de los 3 artefactos | RF-25 | `artifacts.py` | `test_artifacts_validate_against_contracts` | `[ ]` |
-| T-081 | Rankings ciegos: 10 IDs únicos y válidos | RF-25 | `artifacts.py` | **`test_blind_rankings_have_ten_unique_valid_ids`** | `[ ]` |
-| T-082 | Atribución de ≥3 fallos a capa | RF-24 | `evaluation/attribution.py` | `.artifacts/attribution.json` | `[ ]` |
-| T-083 | `aurum deliver` como comando único | RF-28 | `cli.py` | **`test_deliver_is_the_single_entry_point`** | `[ ]` |
-| T-084 | `config/final.yaml` con la configuración de la ejecución final | RF-25 | `config/final.yaml` | revisión | `[ ]` |
+| T-070 | Escritura + validación de los 3 artefactos | RF-25 | `artifacts.py` | `test_artifacts_validate_against_contracts` | `[ ]` |
+| T-071 | Rankings ciegos: 10 IDs únicos y válidos | RF-25 | `artifacts.py` | **`test_blind_rankings_have_ten_unique_valid_ids`** | `[ ]` |
+| T-072 | Atribución de ≥3 fallos a capa | RF-24 | `evaluation/attribution.py` | `.artifacts/attribution.json` | `[ ]` |
+| T-073 | `aurum deliver` como comando único | RF-28 | `cli.py` | **`test_deliver_is_the_single_entry_point`** | `[ ]` |
+| T-074 | `config/final.yaml` con la configuración de la ejecución final | RF-25 | `config/final.yaml` | revisión | `[ ]` |
 
 ## Fase 8 · Operaciones de catálogo
 
@@ -119,9 +124,9 @@ volver al estado base exige reingerir.*
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-060 | Aplicar 24 eventos por `sequence`, distinguiendo tipos | RF-16 | `events.py` | `test_events_apply_in_sequence_order` | `[ ]` |
-| T-061 | Idempotencia de la reaplicación | RF-16 | `events.py` | **`test_events_are_idempotent`** | `[ ]` |
-| T-062 | Visibilidad por ID y por búsqueda, con espera acotada | RF-16 | `events.py` | `test_visibility_after_each_operation_type` | `[ ]` |
+| T-080 | Aplicar 24 eventos por `sequence`, distinguiendo tipos | RF-16 | `events.py` | `test_events_apply_in_sequence_order` | `[ ]` |
+| T-081 | Idempotencia de la reaplicación | RF-16 | `events.py` | **`test_events_are_idempotent`** | `[ ]` |
+| T-082 | Visibilidad por ID y por búsqueda, con espera acotada | RF-16 | `events.py` | `test_visibility_after_each_operation_type` | `[ ]` |
 
 ## Fase 9 · Informe y cierre
 
@@ -139,4 +144,13 @@ volver al estado base exige reingerir.*
 
 Las **negritas** de la columna "Cierra con" son los siete puntos de la checklist
 "Antes de entregar" del enunciado. Ninguna entrega sale sin esos siete en verde:
-T-042, T-044, T-051, T-061, T-075, T-081, T-083, T-093.
+
+| Punto de la checklist | Tarea | Estado |
+|---|---|---|
+| La ingesta repetida no aumenta el recuento | T-042 | `[x]` |
+| Las consultas filtradas nunca devuelven otra marca | T-051 | `[x]` |
+| Los eventos dejan exactamente el estado esperado | T-081 | `[ ]` |
+| Los rankings ciegos: diez IDs únicos y válidos | T-071 | `[ ]` |
+| Un positivo de duplicados señala su candidato | T-065 | `[ ]` |
+| Las métricas se regeneran con un único comando | T-073 | `[ ]` |
+| Sin claves, volúmenes ni datos reservados | T-044, T-093 | `[x]` |
