@@ -406,6 +406,211 @@ def verify(
 
 
 @app.command()
+def search(
+    query: str = typer.Argument(..., help="Consulta en lenguaje natural."),
+    top_k: int = typer.Option(10, "--top-k", "-k", help="Cuántos resultados."),
+    brand: str = typer.Option("", "--brand", "-b", help="Restringe a una marca."),
+) -> None:
+    """Busca en el catálogo. Interfaz común de recuperación (RF-01, RF-13, RF-14)."""
+    from .search import build_live_retriever
+
+    settings = load_settings()
+    try:
+        retriever = build_live_retriever(settings)
+        hits = retriever.search(query, top_k=top_k, brand=brand or None)
+    except Exception as error:
+        typer.secho(f"{type(error).__name__}: {error}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    if not hits:
+        typer.secho(
+            f"Sin resultados para {query!r}"
+            + (f" en la marca {brand!r}" if brand else ""),
+            fg=typer.colors.YELLOW,
+        )
+        return
+
+    typer.echo(f"{'#':>2}  {'score':>7}  {'marca':<22} título")
+    typer.echo("-" * 100)
+    for hit in hits:
+        typer.echo(
+            f"{hit.rank:>2}  {hit.native_score:>7.4f}  {hit.brand[:22]:<22} "
+            f"{hit.title[:60]}"
+        )
+    # El score viaja con su semántica hasta la pantalla (P-03).
+    typer.echo("-" * 100)
+    typer.echo(
+        f"{len(hits)} resultados · score: {hits[0].score_kind}, "
+        f"{'mayor es mejor' if hits[0].higher_is_better else 'menor es mejor'}"
+    )
+
+
+@app.command()
+def evaluate(
+    profile: str = typer.Option("full", "--profile", help="Perfil ingerido."),
+    top_k: int = typer.Option(10, "--top-k", help="Profundidad del ranking."),
+    sweep_ef: bool = typer.Option(
+        False, "--sweep-ef", help="Traza la curva de fidelidad frente a ef_search."
+    ),
+    repetitions: int = typer.Option(
+        10, "--repetitions", help="Repeticiones de latencia."
+    ),
+) -> None:
+    """Mide ranking, fidelidad ANN, filtros y latencia sobre la colección viva.
+
+    Cierra RF-19 a RF-22. La fidelidad compara los IDs de Qdrant con los del
+    oráculo exacto: ambos usan el mismo modelo, así que una diferencia solo
+    puede venir del índice.
+    """
+    import json
+
+    from .config import ARTIFACTS_DIRECTORY, RELEVANCE_THRESHOLD
+    from .data import (
+        load_catalog,
+        load_development_queries,
+        load_filtered_queries,
+        load_relevance_judgments,
+    )
+    from .embeddings import Encoder
+    from .evaluation.fidelity import (
+        check_brand_filters,
+        measure_fidelity,
+        summarize_filters,
+        sweep_ef_search,
+    )
+    from .evaluation.latency import describe_environment, measure_latency
+    from .evaluation.metrics import evaluate_rankings
+    from .search import DenseRetriever, build_live_retriever
+    from .store.exact_store import ExactVectorStore
+    from .text import compose_all
+
+    settings = load_settings()
+    final = _load_final_config()
+    strategy = final.get("representation", {}).get("text_strategy", "title_brand_color")
+
+    typer.echo("Preparando el motor y el oráculo exacto…")
+    catalog = load_catalog(profile)  # type: ignore[arg-type]
+    engine = build_live_retriever(settings, expected_points=len(catalog))
+
+    encoder = Encoder(settings.embedding_model)
+    matrix = encoder.encode(compose_all(catalog.records, strategy), role="document")
+    oracle = DenseRetriever(ExactVectorStore(catalog.records, matrix.vectors), encoder)
+
+    dev_queries = load_development_queries()
+    judgments = load_relevance_judgments()
+    filtered = load_filtered_queries()
+    typer.echo(f"{len(catalog)} productos · {len(dev_queries)} consultas\n")
+
+    # --- Calidad del ranking (RF-19) -----------------------------------------
+    rankings = {
+        query.query_id: [
+            hit.product_id for hit in engine.search(query.text, top_k=top_k)
+        ]
+        for query in dev_queries
+    }
+    report = evaluate_rankings(
+        rankings, judgments, k=top_k, relevance_threshold=RELEVANCE_THRESHOLD
+    )
+    typer.secho("Calidad del ranking", bold=True)
+    typer.echo(
+        f"  nDCG@{top_k}={report.mean_ndcg:.4f}  "
+        f"Recall@{top_k}={report.mean_recall:.4f} "
+        f"(techo {report.mean_recall_ceiling:.4f})  "
+        f"MRR@{top_k}={report.mean_mrr:.4f}"
+    )
+
+    # --- Fidelidad ANN (RF-20) -----------------------------------------------
+    fidelity = measure_fidelity(engine, oracle, dev_queries, k=top_k)
+    typer.secho("\nFidelidad ANN frente al oráculo exacto", bold=True)
+    typer.echo(
+        f"  solapamiento@{top_k}={fidelity.mean_recall:.4f}  "
+        f"orden idéntico={fidelity.mean_rank_agreement:.4f}  "
+        f"consultas perfectas={fidelity.perfect_queries}/{len(dev_queries)}"
+    )
+    for item in fidelity.per_query:
+        if item.recall < 1.0:
+            typer.echo(
+                f"    {item.query_id}: {item.recall:.2f} · perdió {len(item.missed)} "
+                f"candidato(s) que el oráculo sí encontró"
+            )
+
+    sweep: list = []
+    if sweep_ef:
+        typer.secho("\nBarrido de ef_search", bold=True)
+        typer.echo(f"  {'ef':>5}  {'fidelidad':>10}  {'orden':>8}")
+        sweep = sweep_ef_search(engine, oracle, dev_queries, k=top_k)
+        for item in sweep:
+            typer.echo(
+                f"  {item.ef_search:>5}  {item.mean_recall:>10.4f}  "
+                f"{item.mean_rank_agreement:>8.4f}"
+            )
+
+    # --- Filtros (RF-14, RF-22) ----------------------------------------------
+    checks = check_brand_filters(engine, filtered, k=top_k)
+    typer.secho("\nFiltros de marca", bold=True)
+    for check in checks:
+        mark = "OK " if check.compliant else "MAL"
+        typer.echo(
+            f"  [{mark}] {check.query_id} · {check.brand}: "
+            f"{check.matching}/{check.returned} de la marca pedida"
+            + (
+                f" · intrusos: {check.offending_brands}"
+                if check.offending_brands
+                else ""
+            )
+        )
+
+    # --- Latencia (RF-21) ----------------------------------------------------
+    typer.secho("\nLatencia", bold=True)
+    texts = [query.text for query in dev_queries]
+    # Codificar y buscar se miden por separado: en CPU la codificación domina,
+    # y reportarlas juntas escondería cuál es el cuello de botella.
+    encoding = measure_latency(
+        lambda text: encoder.encode([text], role="query"),
+        texts,
+        label="encoding",
+        repetitions=repetitions,
+    )
+    end_to_end = measure_latency(
+        lambda text: engine.search(text, top_k=top_k),
+        texts,
+        label="end_to_end",
+        repetitions=repetitions,
+    )
+    for summary in (encoding, end_to_end):
+        typer.echo(
+            f"  {summary.label:<11} p50={summary.p50_ms:>8.2f} ms  "
+            f"p95={summary.p95_ms:>8.2f} ms  ({summary.count} muestras)"
+        )
+    search_only = end_to_end.p50_ms - encoding.p50_ms
+    typer.echo(f"  {'búsqueda':<11} p50≈{search_only:>8.2f} ms (por diferencia)")
+
+    payload = {
+        "profile": profile,
+        "ranking": report.summary(),
+        "ann_fidelity": fidelity.as_dict(),
+        "ef_sweep": [item.as_dict() for item in sweep],
+        "filters": summarize_filters(checks),
+        "latency": {
+            "encoding": encoding.as_dict(),
+            "end_to_end": end_to_end.as_dict(),
+        },
+        "environment": describe_environment(
+            profile=profile,
+            embedding_model=settings.embedding_model,
+            collection_points=len(catalog),
+            hnsw=settings.hnsw.as_dict(),
+        ),
+    }
+    path = ARTIFACTS_DIRECTORY / "evaluation.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    typer.echo(f"\nEvidencia escrita en {path}")
+
+
+@app.command()
 def reset() -> None:
     """Borra la colección. Destructivo y desactivado por defecto (RF-18)."""
     from .store.qdrant_store import QdrantStore

@@ -30,7 +30,10 @@ index:
   hnsw:
     m: 24
     ef_construct: 120
-    ef_search: 128
+    # 256, no el 128 heredado de la sesión 03. El barrido midió fidelidad 1,0
+    # frente a 0,9875, y las latencias (47,16 ms vs 44,00 ms) están dentro del
+    # ruido del transporte. Ver ADR-007.
+    ef_search: 256
   # En KILOBYTES y por segmento, no por colección. Con los valores por defecto
   # (20.000) la muestra nunca construiría el grafo y Qdrant respondería por
   # fuerza bruta, dejando m y ef_construct sin efecto observable. Ver ADR-006.

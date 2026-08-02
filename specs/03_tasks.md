@@ -75,11 +75,13 @@ evidencia observable.
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-050 | `search()` global con `top_k` | RF-01, RF-13 | `search.py` | `test_top_k_is_honoured` | `[ ]` |
-| T-051 | Filtro de marca nativo con `Filter`/`FieldCondition` | RF-14 | `search.py` | **`test_filtered_queries_never_leak_other_brands`** | `[ ]` |
-| T-052 | Casos límite: colección vacía, filtro sin resultados, motor caído | RF-15 | `search.py` | `test_edge_cases` | `[ ]` |
-| T-053 | Fidelidad ANN vs oráculo + barrido de `hnsw_ef` | RF-20 | `evaluation/fidelity.py` | `ann_fidelity_at_10` en métricas | `[ ]` |
-| T-054 | Latencia p50/p95 con calentamiento | RF-21 | `evaluation/latency.py` | `latency_p50_ms`, `latency_p95_ms` | `[ ]` |
+| T-050 | Interfaz común sobre cualquier almacén + `aurum search` | RF-01, RF-13 | `search.py`, `cli.py` | `test_satisfies_the_retriever_protocol` | `[x]` |
+| T-051 | Filtro de marca nativo con `Filter`/`FieldCondition` | RF-14 | `store/qdrant_store.py` | **10/10 en las 4 consultas reales** | `[x]` |
+| T-052 | Casos límite: colección vacía, filtro sin resultados, motor caído | RF-15 | `store/` | `test_searching_a_missing_collection_fails_loudly` | `[x]` |
+| T-053 | Fidelidad ANN vs oráculo + barrido de `ef_search` | RF-08, RF-20 | `evaluation/fidelity.py` | fidelidad **1,0000** con `ef_search=256` | `[x]` |
+| T-054 | Latencia p50/p95 con calentamiento y entorno | RF-21 | `evaluation/latency.py` | `.artifacts/evaluation.json` | `[x]` |
+| T-055 | Comando `aurum evaluate` con toda la evidencia | RF-19 … RF-22 | `cli.py` | ejecución sobre el catálogo completo | `[x]` |
+| T-056 | ADR-007 sobre `ef_search` | RF-08 | `specs/decisiones/` | revisión | `[x]` |
 
 ## Fase 6 · Operaciones de catálogo
 

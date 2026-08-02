@@ -9,12 +9,13 @@ apart, which is precisely what allows a failure to be attributed to one layer.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
+from .config import Settings
 from .contracts import SearchHit
 from .embeddings import Encoder
-from .store.base import StoreError
-from .store.exact_store import ExactVectorStore
+from .store.base import StoreError, VectorStore
 
 
 @runtime_checkable
@@ -31,12 +32,13 @@ class Retriever(Protocol):
 class DenseRetriever:
     """Encodes the query and searches a vector store.
 
-    The store never sees text and the encoder never sees products: keeping the
-    two apart is what lets the same store be queried by an exact oracle or by
-    an ANN index without touching this class.
+    The store never sees text and the encoder never sees products. That
+    separation is what lets the very same retriever run against the exact
+    NumPy oracle or against Qdrant, which in turn is what makes ANN fidelity
+    measurable: both paths differ only in the store (RF-20).
     """
 
-    def __init__(self, store: ExactVectorStore, encoder: Encoder) -> None:
+    def __init__(self, store: VectorStore, encoder: Encoder) -> None:
         self._store = store
         self._encoder = encoder
         declared = encoder.expected_dimension
@@ -66,3 +68,48 @@ class DenseRetriever:
         # sin que nada falle visiblemente (RF-04).
         matrix = self._encoder.encode([query_text], role="query")
         return self._store.search_vector(matrix.vectors[0], top_k=top_k, brand=brand)
+
+    def search_many(
+        self, query_texts: Sequence[str], *, top_k: int = 10
+    ) -> list[list[SearchHit]]:
+        """Retrieve for several queries, encoding them in a single batch.
+
+        Encoding one query at a time wastes the model's batching, which matters
+        when timing: the cost of encoding would otherwise be mixed into what
+        looks like search latency (RF-21).
+        """
+        texts = list(query_texts)
+        if not texts:
+            return []
+        matrix = self._encoder.encode(texts, role="query")
+        return [
+            self._store.search_vector(matrix.vectors[position], top_k=top_k)
+            for position in range(len(texts))
+        ]
+
+
+def build_live_retriever(
+    settings: Settings, *, expected_points: int | None = None
+) -> DenseRetriever:
+    """Build the retriever the delivery actually uses: Qdrant plus the encoder.
+
+    Verifies the collection before returning it, so a search never runs against
+    a half-ingested collection and produces numbers that look plausible (RF-10).
+    """
+    from .ingest import verify_collection
+    from .store.qdrant_store import QdrantStore
+
+    store = QdrantStore(settings)
+    status = store.status()
+    if not status.exists or status.points_count == 0:
+        raise StoreError(
+            f"La colección {settings.qdrant_collection!r} no está lista. "
+            "Ejecuta `aurum ingest`."
+        )
+    if expected_points is not None:
+        verify_collection(
+            store,
+            expected_points=expected_points,
+            expected_dimension=settings.embedding_dimension,
+        )
+    return DenseRetriever(store, Encoder(settings.embedding_model))

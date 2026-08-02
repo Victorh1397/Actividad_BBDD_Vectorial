@@ -126,6 +126,16 @@ class QdrantStore:
     def size(self) -> int:
         return self.status().points_count
 
+    @property
+    def dimension(self) -> int:
+        """Width of the stored vectors, mirroring ``ExactVectorStore``.
+
+        Part of the :class:`VectorStore` protocol, so a retriever can check it
+        is talking to a collection built with the same model without caring
+        which backend it is.
+        """
+        return self.status().dimension or 0
+
     # ------------------------------------------------------------- esquema
 
     def ensure_collection(self, *, dimension: int, recreate: bool = False) -> bool:
