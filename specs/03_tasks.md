@@ -83,26 +83,25 @@ evidencia observable.
 | T-055 | Comando `aurum evaluate` con toda la evidencia | RF-19 … RF-22 | `cli.py` | ejecución sobre el catálogo completo | `[x]` |
 | T-056 | ADR-007 sobre `ef_search` | RF-08 | `specs/decisiones/` | revisión | `[x]` |
 
-## Fase 6 · Operaciones de catálogo
+> **Sobre el orden de estas tres fases.** Siguen el orden de ejecución fijado en
+> [ADR-001](decisiones/ADR-001-orden-canonico-de-ejecucion.md), no el orden en
+> que se planificaron. Los eventos van **al final** porque sus ocho borrados
+> eliminan seis de las siete referencias de `altas_evaluacion.csv`: aplicarlos
+> antes destruiría el estado base que necesitan los duplicados y los artefactos.
+> Los identificadores `T-0NN` se conservan aunque el orden cambie.
 
-| ID | Tarea | RF | Ficheros | Cierra con | Estado |
-|---|---|---|---|---|---|
-| T-060 | Aplicar 24 eventos por `sequence`, distinguiendo tipos | RF-16 | `events.py` | `test_events_apply_in_sequence_order` | `[ ]` |
-| T-061 | Idempotencia de la reaplicación | RF-16 | `events.py` | **`test_events_are_idempotent`** | `[ ]` |
-| T-062 | Visibilidad por ID y por búsqueda, con espera acotada | RF-16 | `events.py` | `test_visibility_after_each_operation_type` | `[ ]` |
-
-## Fase 7 · Duplicados
+## Fase 6 · Duplicados
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
 | T-070 | Generación de candidatos top-2 vía base vectorial | RF-17 | `duplicates.py` | `test_candidates_come_from_the_vector_store` | `[ ]` |
 | T-071 | Regla score + margen (+ marca / léxico si aporta) | RF-17 | `duplicates.py` | `test_rule_is_deterministic` | `[ ]` |
 | T-072 | Barrido de umbral sobre desarrollo + precision/recall/F1 | RF-23 | `duplicates.py` | `aurum duplicates calibrate` | `[ ]` |
-| T-073 | Congelar umbral en `config/final.yaml` | RF-17 | `config/final.yaml` | revisión antes del paso 7 | `[ ]` |
+| T-073 | Congelar umbral en `config/final.yaml` | RF-17 | `config/final.yaml` | revisión antes de predecir | `[ ]` |
 | T-074 | Análisis separado de FP y FN con coste de negocio | RF-23 | informe | sección del informe | `[ ]` |
 | T-075 | Predicción sobre `altas_evaluacion.csv` | RF-17 | `duplicates.py` | **`test_positive_prediction_names_a_candidate`** | `[ ]` |
 
-## Fase 8 · Evaluación y artefactos
+## Fase 7 · Evaluación y artefactos
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
@@ -111,6 +110,18 @@ evidencia observable.
 | T-082 | Atribución de ≥3 fallos a capa | RF-24 | `evaluation/attribution.py` | `.artifacts/attribution.json` | `[ ]` |
 | T-083 | `aurum deliver` como comando único | RF-28 | `cli.py` | **`test_deliver_is_the_single_entry_point`** | `[ ]` |
 | T-084 | `config/final.yaml` con la configuración de la ejecución final | RF-25 | `config/final.yaml` | revisión | `[ ]` |
+
+## Fase 8 · Operaciones de catálogo
+
+*Prueba operativa aislada. Se ejecuta **después** de `aurum deliver`, cuando los
+tres artefactos ya están escritos: modifica la colección de forma irreversible y
+volver al estado base exige reingerir.*
+
+| ID | Tarea | RF | Ficheros | Cierra con | Estado |
+|---|---|---|---|---|---|
+| T-060 | Aplicar 24 eventos por `sequence`, distinguiendo tipos | RF-16 | `events.py` | `test_events_apply_in_sequence_order` | `[ ]` |
+| T-061 | Idempotencia de la reaplicación | RF-16 | `events.py` | **`test_events_are_idempotent`** | `[ ]` |
+| T-062 | Visibilidad por ID y por búsqueda, con espera acotada | RF-16 | `events.py` | `test_visibility_after_each_operation_type` | `[ ]` |
 
 ## Fase 9 · Informe y cierre
 
