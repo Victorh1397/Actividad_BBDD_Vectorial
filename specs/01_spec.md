@@ -325,19 +325,19 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-09 | **`cerrado`** | Segunda ingesta sobre el perfil `sample`: `variación del recuento: +0`. Cubierto además por `test_double_ingest_keeps_count`. *(Punto 1 de la checklist)* |
 | RF-10 | **`cerrado`** | `aurum verify` exige recuento, dimensión y distancia, y reporta `indexed_vectors_count`: 15.000 de 15.000 en 4 segmentos. |
 | RF-11 | **`cerrado`** | Verificado destruyendo el contenedor (`docker compose down` → `Removed`) y recreándolo: los 15.000 puntos y su índice sobreviven en el volumen. |
-| RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y los tres backends declaran `similarity`. Falta propagarlo al artefacto (Fase 8). |
+| RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y los tres backends declaran `similarity`. Falta propagarlo al artefacto (Fase 7). |
 | RF-13 | **`cerrado`** | `top_k` configurable en los tres backends y en `aurum search`. |
 | RF-14 | **`cerrado`** | El filtro viaja como `Filter/FieldCondition` dentro de la consulta, con índice `KEYWORD` sobre `brand`. Las 4 consultas reales devuelven **10/10** de la marca pedida, sin intrusos. *(Punto 2 de la checklist)* |
 | RF-15 | **`cerrado`** | Colección inexistente o vacía → `CollectionEmptyError` con instrucción; filtro sin resultados → lista vacía documentada; motor caído → `ProviderUnavailableError` que nombra la URL y sugiere `make up`. |
-| RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 6). |
-| RF-17 | `parcial` | `DuplicateDecision` hace imposible un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 7). |
+| RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 8, la última del recorrido de ejecución). |
+| RF-17 | `parcial` | `DuplicateDecision` hace imposible un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 6). |
 | RF-18 | **`cerrado`** | `aurum reset` exige `AURUM_ALLOW_RESET` **y** `AURUM_CONFIRM_CLEANUP` con el nombre exacto —probado en vivo: sin ambas, se bloquea y explica qué falta—, y ningún recurso fuera del prefijo `aurum-market` es alcanzable. |
 | RF-19 | **`cerrado`** | nDCG@10, Recall@10 y MRR@10 graduadas, contrastadas contra valores calculados a mano en `test_metrics.py`. Umbral ≥ 2 declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md) y pasado explícitamente en cada llamada. |
 | RF-20 | **`cerrado`** | Fidelidad **1,0000** con orden idéntico sobre el catálogo completo: el índice no pierde ni un candidato frente al oráculo. Cualquier fallo de ranking queda por tanto atribuido a la representación. |
 | RF-21 | **`cerrado`** | p50 y p95 con calentamiento y repeticiones declarados, separando codificación (0,50 ms) de recorrido completo (81,77 ms), y con el entorno adjunto en `.artifacts/evaluation.json`. |
 | RF-22 | **`cerrado`** | Las 4 consultas filtradas: 10/10 de la marca en todas. |
 | RF-23 … RF-24 | `pendiente` | — |
-| RF-25 | `parcial` | Los seis contratos JSON existen; `experiment_run` ya valida artefactos reales al escribirse. Falta escribir los tres de entrega (Fase 8). |
+| RF-25 | `parcial` | Los seis contratos JSON existen; `experiment_run` ya valida artefactos reales al escribirse. Falta escribir los tres de entrega (Fase 7). |
 | RF-26 | `pendiente` | — |
 | RF-27 | `parcial` | 254 tests cubren IDs, saneado, contratos, métricas, texto, embeddings y seguridad. Faltan batching, filtros nativos y mutaciones. |
 | RF-28 … RF-29 | `pendiente` | — |

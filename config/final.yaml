@@ -56,7 +56,7 @@ ingestion:
   batch_size: 256
 
 # --- Duplicados ---------------------------------------------------------------
-# Se calibra en la Fase 7 y se congela aquí antes de tocar altas_evaluacion.csv
+# Se calibra en la Fase 6 y se congela aquí antes de tocar altas_evaluacion.csv
 # (P-04). Hasta entonces queda declarado como pendiente, no con un valor
 # provisional que pudiera colarse en una ejecución.
 duplicates:
