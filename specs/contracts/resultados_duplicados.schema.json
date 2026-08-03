@@ -13,8 +13,8 @@
     "properties": {
       "incoming_id": {
         "type": "string",
-        "description": "ID de altas_evaluacion.csv.",
-        "pattern": "^EVAL-DUP-[0-9]{3}$"
+        "description": "ID de altas_evaluacion.csv. El fichero trae dos prefijos, EVAL-DUP y EVAL-NEW, igual que el de desarrollo trae DEV-DUP y DEV-NEW. El prefijo revela la etiqueta, asi que la regla NO puede mirarlo: solo el contenido de la ficha.",
+        "pattern": "^EVAL-(DUP|NEW)-[0-9]{3}$"
       },
       "predicted_duplicate": {
         "type": "boolean",

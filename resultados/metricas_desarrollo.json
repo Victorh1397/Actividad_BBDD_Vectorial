@@ -1,0 +1,30 @@
+{
+  "ndcg_at_10": 0.5421518524581523,
+  "recall_at_10": 0.24808529284335734,
+  "mrr_at_10": 0.9166666666666666,
+  "relevance_threshold": 2.0,
+  "recall_ceiling": 0.5188024341250148,
+  "ann_fidelity_at_10": 1.0,
+  "latency_p50_ms": 59.3685,
+  "latency_p95_ms": 85.15544499999996,
+  "duplicates": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "threshold": 0.9191
+  },
+  "environment": {
+    "python_version": "3.12.13",
+    "platform": "Windows 11",
+    "processor": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "cpu_count": 8,
+    "executable": "python.exe",
+    "profile": "full",
+    "embedding_model": "intfloat/multilingual-e5-base",
+    "collection_points": 15000,
+    "hnsw_ef_search": 256,
+    "warmup_repetitions": 2,
+    "repetitions": 5,
+    "query_count": 8
+  }
+}

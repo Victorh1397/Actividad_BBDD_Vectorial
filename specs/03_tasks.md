@@ -111,11 +111,12 @@ evidencia observable.
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-070 | Escritura + validación de los 3 artefactos | RF-25 | `artifacts.py` | `test_artifacts_validate_against_contracts` | `[ ]` |
-| T-071 | Rankings ciegos: 10 IDs únicos y válidos | RF-25 | `artifacts.py` | **`test_blind_rankings_have_ten_unique_valid_ids`** | `[ ]` |
-| T-072 | Atribución de ≥3 fallos a capa | RF-24 | `evaluation/attribution.py` | `.artifacts/attribution.json` | `[ ]` |
-| T-073 | `aurum deliver` como comando único | RF-28 | `cli.py` | **`test_deliver_is_the_single_entry_point`** | `[ ]` |
-| T-074 | `config/final.yaml` con la configuración de la ejecución final | RF-25 | `config/final.yaml` | revisión | `[ ]` |
+| T-070 | Escritura + validación de los 3 artefactos | RF-25 | `artifacts.py` | `test_all_three_artifacts_validate_against_their_contracts` | `[x]` |
+| T-071 | Rankings ciegos: 10 IDs únicos y válidos | RF-25 | `artifacts.py` | **`test_blind_rankings_have_ten_unique_valid_ids`** | `[x]` |
+| T-072 | Atribución de ≥3 fallos a capa | RF-24 | `evaluation/attribution.py` | 5 fallos en 3 capas · `.artifacts/attribution.json` | `[x]` |
+| T-073 | `aurum deliver` como comando único | RF-28 | `cli.py` | **`test_deliver_is_the_single_entry_point`** | `[x]` |
+| T-074 | `config/final.yaml` con la configuración de la ejecución final | RF-25 | `config/final.yaml` | `test_the_frozen_threshold_is_the_one_that_was_used` | `[x]` |
+| T-075 | Checklist de entrega como prueba ejecutable | RF-27 | `tests/test_entrega.py` | 26 tests | `[x]` |
 
 ## Fase 8 · Operaciones de catálogo
 
@@ -151,7 +152,10 @@ Las **negritas** de la columna "Cierra con" son los siete puntos de la checklist
 | La ingesta repetida no aumenta el recuento | T-042 | `[x]` |
 | Las consultas filtradas nunca devuelven otra marca | T-051 | `[x]` |
 | Los eventos dejan exactamente el estado esperado | T-081 | `[ ]` |
-| Los rankings ciegos: diez IDs únicos y válidos | T-071 | `[ ]` |
-| Un positivo de duplicados señala su candidato | T-065 | `[ ]` |
-| Las métricas se regeneran con un único comando | T-073 | `[ ]` |
+| Los rankings ciegos: diez IDs únicos y válidos | T-071 | `[x]` |
+| Un positivo de duplicados señala su candidato | T-065 | `[x]` |
+| Las métricas se regeneran con un único comando | T-073 | `[x]` |
 | Sin claves, volúmenes ni datos reservados | T-044, T-093 | `[x]` |
+
+**Seis de siete.** Solo queda el de los eventos, que es precisamente la Fase 8.
+Todos se ejecutan con `uv run pytest tests/test_entrega.py`.

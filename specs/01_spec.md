@@ -310,7 +310,7 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 6 · 332 tests en verde.
+**Última actualización:** cierre de la Fase 7 · 358 tests en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
@@ -325,7 +325,7 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-09 | **`cerrado`** | Segunda ingesta sobre el perfil `sample`: `variación del recuento: +0`. Cubierto además por `test_double_ingest_keeps_count`. *(Punto 1 de la checklist)* |
 | RF-10 | **`cerrado`** | `aurum verify` exige recuento, dimensión y distancia, y reporta `indexed_vectors_count`: 15.000 de 15.000 en 4 segmentos. |
 | RF-11 | **`cerrado`** | Verificado destruyendo el contenedor (`docker compose down` → `Removed`) y recreándolo: los 15.000 puntos y su índice sobreviven en el volumen. |
-| RF-12 | `parcial` | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, y los tres backends declaran `similarity`. Falta propagarlo al artefacto (Fase 7). |
+| RF-12 | **`cerrado`** | `SearchHit` rechaza `score_kind="distance"` junto a `higher_is_better=True`, los tres backends declaran `similarity`, y el score nativo llega a `resultados_busqueda.csv` sin reescalar (`test_the_native_score_travels_untransformed`). |
 | RF-13 | **`cerrado`** | `top_k` configurable en los tres backends y en `aurum search`. |
 | RF-14 | **`cerrado`** | El filtro viaja como `Filter/FieldCondition` dentro de la consulta, con índice `KEYWORD` sobre `brand`. Las 4 consultas reales devuelven **10/10** de la marca pedida, sin intrusos. *(Punto 2 de la checklist)* |
 | RF-15 | **`cerrado`** | Colección inexistente o vacía → `CollectionEmptyError` con instrucción; filtro sin resultados → lista vacía documentada; motor caído → `ProviderUnavailableError` que nombra la URL y sugiere `make up`. |
@@ -337,11 +337,31 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-21 | **`cerrado`** | p50 y p95 con calentamiento y repeticiones declarados, separando codificación (0,50 ms) de recorrido completo (81,77 ms), y con el entorno adjunto en `.artifacts/evaluation.json`. |
 | RF-22 | **`cerrado`** | Las 4 consultas filtradas: 10/10 de la marca en todas. |
 | RF-23 | **`cerrado`** | Sobre desarrollo: precision 1,0 · recall 1,0 · F1 1,0 · TP=7 FP=0 TN=7 FN=0. Falsos positivos y negativos analizados por separado con su coste de negocio en `error_analysis` y en [ADR-008](decisiones/ADR-008-umbral-de-duplicados.md). |
-| RF-24 | `pendiente` | Ya hay cuatro fallos candidatos documentados: tres de representación (Fase 5) y un falso negativo de duplicados (`EVAL-DUP-004`). Falta el análisis formal (Fase 7). |
-| RF-25 | `parcial` | Los seis contratos JSON existen; `experiment_run` ya valida artefactos reales al escribirse. Falta escribir los tres de entrega (Fase 7). |
+| RF-24 | **`cerrado`** | Cinco fallos atribuidos en `.artifacts/attribution.json`, cubriendo **tres capas**: representación (3), índice (1) y datos (1). Cada uno con su evidencia; el de índice se provoca bajando `ef_search` a 16, porque con la configuración entregada la fidelidad es 1,0 y ningún fallo real sería suyo. |
+| RF-25 | **`cerrado`** | Los tres artefactos escritos y validados contra su contrato **antes** de tocar disco, y re-validados al leerlos: 120 filas / 12 consultas, 14 decisiones, y las métricas mínimas. Falta el diagrama de arquitectura (Fase 9). |
 | RF-26 | `pendiente` | — |
-| RF-27 | `parcial` | 254 tests cubren IDs, saneado, contratos, métricas, texto, embeddings y seguridad. Faltan batching, filtros nativos y mutaciones. |
-| RF-28 … RF-29 | `pendiente` | — |
+| RF-27 | **`cerrado`** | 358 tests cubren IDs, batching, filtros nativos, mutaciones de la colección y formato de resultados, más los siete puntos de la checklist en `test_entrega.py`. |
+| RF-28 | **`cerrado`** | `aurum deliver` regenera los tres artefactos en un solo comando, y un test verifica que **no** aplica los eventos, cosa que ninguna salida delataría. *(Punto 6 de la checklist)* |
+| RF-29 | `pendiente` | — |
+
+### Hallazgos de la Fase 7
+
+19. **Con fidelidad 1,0, ningún fallo real puede atribuirse al índice.** Es una
+    buena noticia con un efecto colateral incómodo: la atribución se queda sin
+    poder demostrar que sabe distinguir esa capa. Se resuelve **provocando** el
+    fallo —bajando `ef_search` a 16, donde el índice pierde 3 de 10 productos
+    que el oráculo sí encuentra— y documentándolo como capacidad de
+    diagnóstico, no como defecto del sistema entregado.
+20. **Un contrato bloqueó un error del propio autor del contrato.** El patrón
+    de `incoming_id` era `^EVAL-DUP-[0-9]{3}$`, arrastrando la suposición
+    equivocada de que todos los IDs ciegos empezarían por `EVAL-DUP`. Al
+    ejecutar `aurum deliver`, la validación se negó a escribir y señaló la fila
+    exacta. Una entrega inválida no llegó a existir.
+21. **Hay fallos que ninguna salida delata.** Que `deliver` no aplique los
+    eventos no se puede comprobar mirando sus resultados: solo inspeccionando
+    su código. De ahí `test_deliver_never_applies_the_catalog_events`, que lee
+    el fuente. Es inusual, pero es la única forma de verificar algo que debe
+    **no ocurrir**.
 
 ### Hallazgos de la Fase 6
 

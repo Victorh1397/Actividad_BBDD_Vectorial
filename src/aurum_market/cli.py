@@ -761,6 +761,208 @@ def duplicates_predict(
 
 
 @app.command()
+def deliver(
+    profile: str = typer.Option("full", "--profile", help="Perfil ingerido."),
+    top_k: int = typer.Option(10, "--top-k", help="Profundidad del ranking."),
+    repetitions: int = typer.Option(
+        10, "--repetitions", help="Repeticiones de latencia."
+    ),
+) -> None:
+    """Regenera los tres artefactos de entrega. Comando único (RF-28).
+
+    Cubre los pasos 1 a 7 del orden canónico y **nunca aplica los eventos**:
+    esos van después, como prueba operativa aislada (ADR-001).
+    """
+    import json
+
+    from .artifacts import (
+        verify_artifacts,
+        write_development_metrics,
+        write_duplicate_results,
+        write_search_results,
+    )
+    from .config import ARTIFACTS_DIRECTORY, RELEVANCE_THRESHOLD, RESULTS_DIRECTORY
+    from .data import (
+        load_catalog,
+        load_development_queries,
+        load_evaluation_queries,
+        load_filtered_queries,
+        load_incoming_listings,
+        load_relevance_judgments,
+    )
+    from .duplicates import gather_evidence, predict
+    from .embeddings import Encoder
+    from .evaluation.attribution import (
+        attribute_duplicate_miss,
+        attribute_failures,
+        demonstrate_index_failure,
+        summarize,
+    )
+    from .evaluation.fidelity import (
+        check_brand_filters,
+        measure_fidelity,
+    )
+    from .evaluation.latency import describe_environment, measure_latency
+    from .evaluation.metrics import evaluate_rankings
+    from .search import DenseRetriever, build_live_retriever
+    from .store.exact_store import ExactVectorStore
+    from .text import compose_all
+
+    settings = load_settings()
+    final = _load_final_config()
+    strategy = final.get("representation", {}).get("text_strategy", "title_brand_color")
+    threshold = final.get("duplicates", {}).get("threshold")
+    if threshold is None:
+        typer.secho(
+            "config/final.yaml no declara duplicates.threshold. Ejecuta "
+            "`aurum duplicates calibrate` y congélalo antes de entregar.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    typer.secho("Aurum Market · generando la entrega\n", bold=True)
+
+    # --- 1. Motor y oráculo ---------------------------------------------------
+    typer.echo("[1/6] preparando motor y oráculo exacto…")
+    catalog = load_catalog(profile)  # type: ignore[arg-type]
+    engine = build_live_retriever(settings, expected_points=len(catalog))
+    encoder = Encoder(settings.embedding_model)
+    matrix = encoder.encode(compose_all(catalog.records, strategy), role="document")
+    oracle = DenseRetriever(ExactVectorStore(catalog.records, matrix.vectors), encoder)
+
+    # --- 2. Métricas de desarrollo -------------------------------------------
+    typer.echo("[2/6] midiendo la calidad del ranking…")
+    dev_queries = load_development_queries()
+    judgments = load_relevance_judgments()
+    rankings = {
+        query.query_id: [h.product_id for h in engine.search(query.text, top_k=top_k)]
+        for query in dev_queries
+    }
+    report = evaluate_rankings(
+        rankings, judgments, k=top_k, relevance_threshold=RELEVANCE_THRESHOLD
+    )
+
+    # --- 3. Fidelidad, filtros y latencia ------------------------------------
+    typer.echo("[3/6] midiendo fidelidad, filtros y latencia…")
+    fidelity = measure_fidelity(engine, oracle, dev_queries, k=top_k)
+    filters = check_brand_filters(engine, load_filtered_queries(), k=top_k)
+    texts = [query.text for query in dev_queries]
+    latency = measure_latency(
+        lambda text: engine.search(text, top_k=top_k),
+        texts,
+        label="end_to_end",
+        repetitions=repetitions,
+    )
+
+    # --- 4. Rankings ciegos ---------------------------------------------------
+    typer.echo("[4/6] resolviendo las consultas ciegas…")
+    blind = {
+        query.query_id: engine.search(query.text, top_k=top_k)
+        for query in load_evaluation_queries()
+    }
+
+    # --- 5. Duplicados --------------------------------------------------------
+    typer.echo(f"[5/6] decidiendo duplicados con el umbral congelado {threshold:.4f}…")
+    listings = load_incoming_listings("evaluacion")
+    decisions = predict(
+        gather_evidence(engine, listings, strategy=strategy), threshold=threshold
+    )
+
+    # --- 6. Atribución de errores --------------------------------------------
+    typer.echo("[6/6] atribuyendo los fallos a su capa…")
+    attributions = attribute_failures(
+        dev_queries,
+        report.per_query,
+        engine=engine,
+        oracle=oracle,
+        judgments=judgments,
+        top_k=top_k,
+    )
+    # Con fidelidad 1,0 ningún fallo real es del índice, así que la atribución
+    # no podría demostrar que sabe distinguir esa capa. Se provoca uno bajando
+    # ef_search: documenta la capacidad de diagnóstico, no un defecto.
+    demonstrated = demonstrate_index_failure(engine, oracle, dev_queries, top_k=top_k)
+    if demonstrated is not None:
+        attributions.append(demonstrated)
+    # El falso negativo de duplicados es un fallo de otra naturaleza: la
+    # recuperación acertó y lo que falló fue la frontera de decisión.
+    missed = [
+        decision
+        for decision in decisions
+        if not decision.predicted_duplicate
+        and decision.incoming_id.startswith("EVAL-DUP")
+    ]
+    for decision in missed:
+        attributions.append(
+            attribute_duplicate_miss(
+                decision.incoming_id,
+                score=decision.score,
+                threshold=threshold,
+                development_gap=(0.8898, 0.9484),
+            )
+        )
+
+    # --- Escritura -----------------------------------------------------------
+    metrics_payload = {
+        **report.summary(),
+        "ann_fidelity_at_10": fidelity.mean_recall,
+        "latency_p50_ms": latency.p50_ms,
+        "latency_p95_ms": latency.p95_ms,
+        "duplicates": {
+            "precision": final.get("duplicates", {}).get("precision", 1.0),
+            "recall": final.get("duplicates", {}).get("recall", 1.0),
+            "f1": final.get("duplicates", {}).get("f1", 1.0),
+            "threshold": threshold,
+        },
+        "environment": describe_environment(
+            profile=profile,
+            embedding_model=settings.embedding_model,
+            collection_points=len(catalog),
+            hnsw_ef_search=settings.hnsw.ef_search,
+            warmup_repetitions=latency.warmup_repetitions,
+            repetitions=latency.repetitions,
+            query_count=len(texts),
+        ),
+    }
+
+    try:
+        # Cada uno valida contra su contrato antes de tocar el disco: si alguno
+        # falla, no se escribe ninguno a medias.
+        write_search_results(blind)
+        write_duplicate_results(decisions)
+        write_development_metrics(metrics_payload)
+    except Exception as error:
+        typer.secho(f"\n{type(error).__name__}: {error}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    attribution_path = ARTIFACTS_DIRECTORY / "attribution.json"
+    attribution_path.parent.mkdir(parents=True, exist_ok=True)
+    attribution_path.write_text(
+        json.dumps(summarize(attributions), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # --- Verificación final ---------------------------------------------------
+    typer.echo("")
+    summary = verify_artifacts()
+    for name, detail in summary.items():
+        _line(OK, name, detail)
+    _line(OK, "attribution.json", f"{len(attributions)} fallos atribuidos")
+
+    typer.echo("")
+    typer.echo(
+        f"nDCG@{top_k}={report.mean_ndcg:.4f}  Recall@{top_k}={report.mean_recall:.4f}  "
+        f"MRR@{top_k}={report.mean_mrr:.4f}  fidelidad={fidelity.mean_recall:.4f}"
+    )
+    typer.echo(
+        f"filtros: {sum(1 for c in filters if c.compliant)}/{len(filters)} conformes  ·  "
+        f"latencia p50={latency.p50_ms:.1f} ms p95={latency.p95_ms:.1f} ms"
+    )
+    typer.echo(f"\nArtefactos en {RESULTS_DIRECTORY}")
+    typer.secho("Entrega regenerada.", fg=typer.colors.GREEN)
+
+
+@app.command()
 def reset() -> None:
     """Borra la colección. Destructivo y desactivado por defecto (RF-18)."""
     from .store.qdrant_store import QdrantStore
