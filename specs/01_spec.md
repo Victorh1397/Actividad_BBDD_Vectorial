@@ -310,7 +310,7 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 5 · 303 tests en verde.
+**Última actualización:** cierre de la Fase 6 · 332 tests en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
@@ -330,17 +330,40 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-14 | **`cerrado`** | El filtro viaja como `Filter/FieldCondition` dentro de la consulta, con índice `KEYWORD` sobre `brand`. Las 4 consultas reales devuelven **10/10** de la marca pedida, sin intrusos. *(Punto 2 de la checklist)* |
 | RF-15 | **`cerrado`** | Colección inexistente o vacía → `CollectionEmptyError` con instrucción; filtro sin resultados → lista vacía documentada; motor caído → `ProviderUnavailableError` que nombra la URL y sugiere `make up`. |
 | RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 8, la última del recorrido de ejecución). |
-| RF-17 | `parcial` | `DuplicateDecision` hace imposible un positivo sin `matched_product_id`. Falta la regla y su calibración (Fase 6). |
+| RF-17 | **`cerrado`** | Candidatos generados por la base vectorial; regla `score >= 0,9191` con umbral congelado en `config/final.yaml` **antes** de predecir sobre el conjunto ciego ([ADR-008](decisiones/ADR-008-umbral-de-duplicados.md)). `DuplicateDecision` impide por construcción un positivo sin `matched_product_id`. *(Punto 5 de la checklist)* |
 | RF-18 | **`cerrado`** | `aurum reset` exige `AURUM_ALLOW_RESET` **y** `AURUM_CONFIRM_CLEANUP` con el nombre exacto —probado en vivo: sin ambas, se bloquea y explica qué falta—, y ningún recurso fuera del prefijo `aurum-market` es alcanzable. |
 | RF-19 | **`cerrado`** | nDCG@10, Recall@10 y MRR@10 graduadas, contrastadas contra valores calculados a mano en `test_metrics.py`. Umbral ≥ 2 declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md) y pasado explícitamente en cada llamada. |
 | RF-20 | **`cerrado`** | Fidelidad **1,0000** con orden idéntico sobre el catálogo completo: el índice no pierde ni un candidato frente al oráculo. Cualquier fallo de ranking queda por tanto atribuido a la representación. |
 | RF-21 | **`cerrado`** | p50 y p95 con calentamiento y repeticiones declarados, separando codificación (0,50 ms) de recorrido completo (81,77 ms), y con el entorno adjunto en `.artifacts/evaluation.json`. |
 | RF-22 | **`cerrado`** | Las 4 consultas filtradas: 10/10 de la marca en todas. |
-| RF-23 … RF-24 | `pendiente` | — |
+| RF-23 | **`cerrado`** | Sobre desarrollo: precision 1,0 · recall 1,0 · F1 1,0 · TP=7 FP=0 TN=7 FN=0. Falsos positivos y negativos analizados por separado con su coste de negocio en `error_analysis` y en [ADR-008](decisiones/ADR-008-umbral-de-duplicados.md). |
+| RF-24 | `pendiente` | Ya hay cuatro fallos candidatos documentados: tres de representación (Fase 5) y un falso negativo de duplicados (`EVAL-DUP-004`). Falta el análisis formal (Fase 7). |
 | RF-25 | `parcial` | Los seis contratos JSON existen; `experiment_run` ya valida artefactos reales al escribirse. Falta escribir los tres de entrega (Fase 7). |
 | RF-26 | `pendiente` | — |
 | RF-27 | `parcial` | 254 tests cubren IDs, saneado, contratos, métricas, texto, embeddings y seguridad. Faltan batching, filtros nativos y mutaciones. |
 | RF-28 … RF-29 | `pendiente` | — |
+
+### Hallazgos de la Fase 6
+
+15. **El catálogo ya contiene duplicados internos.** `B00MG5Q8TE` y
+    `B000G3T55M` son el mismo legging NIKE, separados por 0,0002 de similitud.
+    El problema que Aurum Market quiere resolver **ya está dentro de sus
+    datos**, no solo en las altas que llegan.
+16. **Lo que decidió la calidad de la detección no fue la regla, sino el
+    formato de la consulta.** Componer la ficha entrante igual que el catálogo
+    —`title + marca + color`— multiplica por 18 la separación entre clases
+    (de +0,0032 a +0,0586) y lleva los candidatos correctos de 6/7 a 7/7.
+    Comparar el `text` en bruto contra un catálogo indexado de otra forma
+    compara dos cosas distintas.
+17. **El margen respecto al segundo candidato no discrimina.** Duplicados
+    0,0002–0,1162 y productos nuevos 0,0004–0,0200: se solapan por completo.
+    Se registra para explicar decisiones ajustadas, pero no entra en la regla.
+18. **Catorce casos son pocos, por limpia que sea la separación.** Sobre el
+    conjunto ciego, `EVAL-DUP-004` puntuó 0,8907 y quedó por debajo del umbral
+    congelado (0,9191) — pero **dentro del hueco de desarrollo**
+    [0,8898, 0,9484]. Un umbral en el borde inferior lo habría capturado. El
+    punto medio se eligió por robustez antes de ver nada de esto, y **no se
+    revisa** ([P-04](00_constitution.md)). Va al informe tal cual.
 
 ### Hallazgos de la Fase 5
 
