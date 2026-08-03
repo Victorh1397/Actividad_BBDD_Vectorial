@@ -425,3 +425,93 @@ class TestRealEventFile:
     def test_deletions_carry_no_sheet_and_upserts_do(self) -> None:
         for event in self.events():
             assert (event.record is None) == event.is_deletion
+
+
+@pytest.mark.integration
+class TestAgainstTheRealEngine:
+    """Los mismos hechos contra Qdrant, sobre una colección propia.
+
+    El almacén falso implementa lo que `events.py` espera; esto comprueba que
+    Qdrant lo cumple de verdad. Nunca toca la colección de la entrega: un test
+    no puede destruir una ingesta real.
+    """
+
+    @pytest.fixture
+    def store(self):
+        from aurum_market.config import RESOURCE_PREFIX
+        from aurum_market.store.qdrant_store import QdrantStore
+
+        from .test_config import make_settings
+
+        name = f"{RESOURCE_PREFIX}-tests-events"
+        settings = make_settings(
+            qdrant_collection=name, allow_reset=True, confirm_cleanup=name
+        )
+        store = QdrantStore(settings)
+        try:
+            store.health()
+        except Exception as error:
+            pytest.skip(f"Qdrant no disponible: {error}")
+        store.reset()
+        store.ensure_collection(dimension=16)
+        yield store
+        store.reset()
+
+    def seed(self, store, encoder, product_id: str, title: str) -> None:
+        record = make_record(product_id, title)
+        vector = encoder.encode([f"{title}. Marca: Marca. Color: negro"]).vectors[0]
+        store.upsert_batch([record], vector.reshape(1, -1))
+
+    def test_events_are_idempotent(self, store) -> None:
+        """Punto 3 de "Antes de entregar", contra el motor que se entrega."""
+        encoder = FakeEncoder()
+        self.seed(store, encoder, "OLD-1", "Producto antiguo uno")
+        self.seed(store, encoder, "OLD-2", "Producto antiguo dos")
+        store.wait_until_indexed(expected_points=2)
+
+        events = [
+            make_event(1, "UPSERT", "OLD-1", "Producto antiguo uno - ficha revisada"),
+            make_event(2, "DELETE", "OLD-2"),
+            make_event(3, "UPSERT", "NEW-1", "Producto nuevo"),
+        ]
+
+        first = apply_events(events, store, encoder, timeout_seconds=30.0)
+        state_after_first = snapshot_state(events, store)
+
+        second = apply_events(
+            events, store, encoder, measure_visibility=False, timeout_seconds=30.0
+        )
+        state_after_second = snapshot_state(events, store)
+
+        assert state_after_first == state_after_second
+        assert (first.altas, first.bajas_efectivas) == (1, 1)
+        assert (second.altas, second.bajas_efectivas) == (0, 0)
+        assert first.points_after == second.points_after == 2
+
+    def test_every_kind_becomes_visible_through_both_channels(self, store) -> None:
+        """RF-16: por ID y por vector, con espera acotada, contra Qdrant."""
+        encoder = FakeEncoder()
+        self.seed(store, encoder, "OLD-1", "Producto antiguo uno")
+        self.seed(store, encoder, "OLD-2", "Producto antiguo dos")
+        store.wait_until_indexed(expected_points=2)
+
+        report = apply_events(
+            [
+                make_event(1, "UPSERT", "OLD-1", "Producto antiguo uno - revisado"),
+                make_event(2, "DELETE", "OLD-2"),
+                make_event(3, "UPSERT", "NEW-1", "Producto nuevo"),
+            ],
+            store,
+            encoder,
+            timeout_seconds=30.0,
+        )
+
+        assert {probe.kind for probe in report.probes} == {
+            "alta",
+            "actualizacion",
+            "baja",
+        }
+        for probe in report.probes:
+            assert probe.id_evidence and probe.search_evidence
+        baja = next(probe for probe in report.probes if probe.kind == "baja")
+        assert "antes de la baja aparecía" in baja.baseline

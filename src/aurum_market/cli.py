@@ -27,6 +27,14 @@ OK = "  OK  "
 FAIL = " FALLO"
 WARN = " AVISO"
 
+# La consola de Windows abre en cp1252, donde no existen caracteres como "→", y
+# `print` levanta UnicodeEncodeError: un comando muere por cómo escribe su
+# salida y no por lo que hace. Degradar el carácter a "?" siempre es preferible
+# a abortar un trabajo ya terminado (RF-26).
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
+
 
 def _line(status: str, message: str, detail: str = "") -> None:
     suffix = f" — {detail}" if detail else ""
@@ -251,7 +259,7 @@ def experiment(
         typer.echo(
             f"  nDCG@{top_k}={result.report.mean_ndcg:.4f}  "
             f"Recall@{top_k}={result.report.mean_recall:.4f}  "
-            f"MRR@{top_k}={result.report.mean_mrr:.4f}   → {path.name}\n"
+            f"MRR@{top_k}={result.report.mean_mrr:.4f}   -> {path.name}\n"
         )
         results.append(result)
 
@@ -1051,7 +1059,7 @@ def events(
         f"{report.altas} altas · {report.actualizaciones} actualizaciones · "
         f"{report.bajas} bajas ({report.bajas_efectivas} efectivas)"
     )
-    typer.echo(f"puntos: {report.points_before} → {report.points_after}")
+    typer.echo(f"puntos: {report.points_before} -> {report.points_after}")
 
     for probe in report.probes:
         typer.echo(f"\n[{probe.kind}] {probe.event_id} · {probe.product_id}")
@@ -1080,7 +1088,7 @@ def events(
             f"{second.altas} altas · {second.actualizaciones} actualizaciones · "
             f"{second.bajas} bajas ({second.bajas_efectivas} efectivas)"
         )
-        typer.echo(f"puntos: {second.points_before} → {second.points_after}")
+        typer.echo(f"puntos: {second.points_before} -> {second.points_after}")
         colour = typer.colors.GREEN if identical else typer.colors.RED
         typer.secho(
             "Estado idéntico tras la segunda aplicación."
