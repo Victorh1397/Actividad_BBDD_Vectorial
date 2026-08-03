@@ -1,4 +1,4 @@
-.PHONY: setup up down doctor test lint format ingest evaluate deliver clean reset
+.PHONY: setup up down doctor test lint format ingest evaluate deliver informe clean reset
 
 COMPOSE := docker compose -f deploy/qdrant/compose.yaml
 
@@ -35,6 +35,10 @@ evaluate:
 # Comando único que regenera todos los artefactos de entrega (RF-28).
 deliver:
 	uv run aurum deliver
+
+# Renderiza docs/informe/informe.html a PDF y comprueba el límite de 10 páginas.
+informe:
+	uv run python docs/informe/generar_pdf.py
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

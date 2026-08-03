@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Aurum Market · Informe</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm 16mm; }
+
+  :root {
+    --ink: #16202b;
+    --soft: #55636f;
+    --line: #d3dae1;
+    --accent: #1f4e79;
+    --warm: #7b3f00;
+    --bg-soft: #f4f7fa;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.2pt;
+    line-height: 1.45;
+    color: var(--ink);
+    margin: 0;
+    hyphens: auto;
+  }
+
+  h1 {
+    font-size: 21pt; line-height: 1.15; margin: 0 0 2mm;
+    color: var(--accent); letter-spacing: -0.4pt;
+  }
+  h2 {
+    font-size: 13pt; margin: 7mm 0 2.5mm; color: var(--accent);
+    border-bottom: 1.4pt solid var(--accent); padding-bottom: 1.2mm;
+    break-after: avoid;
+  }
+  h3 {
+    font-size: 10.8pt; margin: 4.5mm 0 1.5mm; color: var(--ink);
+    break-after: avoid;
+  }
+  p { margin: 0 0 2.4mm; text-align: justify; }
+
+  .subtitle { font-size: 11pt; color: var(--soft); margin: 0 0 1.5mm; }
+  .meta {
+    font-size: 8.6pt; color: var(--soft); margin: 0 0 5mm;
+    padding-bottom: 3mm; border-bottom: 0.6pt solid var(--line);
+  }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 2.5mm 0 3.5mm;
+    font-size: 9.1pt; break-inside: avoid;
+  }
+  th {
+    text-align: left; background: var(--bg-soft); color: var(--accent);
+    font-weight: 600; padding: 1.5mm 2mm;
+    border-bottom: 1pt solid var(--accent);
+  }
+  td { padding: 1.4mm 2mm; border-bottom: 0.5pt solid var(--line); vertical-align: top; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hi td { background: #fdf6ec; font-weight: 600; }
+
+  code {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 8.6pt; background: var(--bg-soft); padding: 0.3mm 1mm;
+    border-radius: 1.5pt;
+  }
+  pre {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 8.2pt; line-height: 1.35; background: var(--bg-soft);
+    border-left: 2pt solid var(--accent); padding: 2.5mm 3mm;
+    margin: 2.5mm 0 3.5mm; white-space: pre;
+    /* Sin overflow:hidden a propósito: si un bloque creciera de más, debe
+       verse desbordado y no recortado en silencio. El más ancho hoy mide 76
+       caracteres y el margen admite ~99. */
+    break-inside: avoid;
+  }
+
+  .key {
+    background: #fdf6ec; border-left: 2.5pt solid var(--warm);
+    padding: 2.5mm 3mm; margin: 3mm 0; break-inside: avoid;
+  }
+  .key p:last-child { margin-bottom: 0; }
+  .key .label {
+    display: block; font-size: 7.8pt; font-weight: 700; color: var(--warm);
+    text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 1mm;
+  }
+
+  .cols { display: flex; gap: 5mm; }
+  .cols > div { flex: 1; }
+
+  .page { break-before: page; }
+  ul { margin: 0 0 2.5mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
+  strong { font-weight: 600; }
+  .sm { font-size: 8.6pt; color: var(--soft); }
+  footer {
+    margin-top: 6mm; padding-top: 2.5mm; border-top: 0.6pt solid var(--line);
+    font-size: 8.2pt; color: var(--soft);
+  }
+</style>
+</head>
+<body>
+
+<h1>Aurum Market</h1>
+<p class="subtitle">Descubrimiento semántico y control de duplicados sobre un catálogo de 15.000 productos</p>
+<p class="meta">
+  Módulo 10 · Bases de Datos Vectoriales · Pontia &nbsp;·&nbsp;
+  Qdrant 1.18 · multilingual-e5-base · 768 dimensiones · coseno &nbsp;·&nbsp;
+  Sin LLM en tiempo de ejecución
+</p>
+
+<h2>1 · El problema</h2>
+
+<p>
+Aurum Market vende de todo y su buscador solo encuentra lo que se escribe con
+las palabras exactas de la ficha. Dos recorridos concretos fallan: un cliente
+que describe lo que necesita en lugar de nombrarlo se va sin comprar, y el
+equipo de catálogo publica duplicados que nadie detecta hasta que un cliente se
+queja.
+</p>
+
+<p>
+Ambos son el mismo problema técnico —comparar significados en vez de cadenas— y
+por eso se resuelven con una sola base vectorial. La restricción de partida es
+que <strong>no puede intervenir ningún LLM en tiempo de ejecución</strong>: lo
+que se evalúa es si la representación y el índice, por sí solos, sostienen las
+decisiones.
+</p>
+
+<p>
+El riesgo real de un encargo así no es que no funcione, sino que funcione
+<em>sin que se pueda demostrar por qué</em>. El desarrollo se organizó
+alrededor de esa idea: cada decisión se contrasta con una medición, y cada
+medición viene con la evidencia que permite reproducirla.
+</p>
+
+<h2>2 · Cómo se mide</h2>
+
+<p>
+Los juicios de relevancia son <strong>graduados</strong>, no binarios: cada par
+consulta-producto está etiquetado como Exact (3), Substitute (2), Complement (1)
+o Irrelevant (0). Se cuentan como relevantes los grados ≥ 2 —lo que el cliente
+buscaba y lo que le sirve igual, pero no un accesorio compatible—, y ese umbral
+se declaró antes de medir nada.
+</p>
+
+<table>
+  <tr><th>Conjunto</th><th class="n">Elementos</th><th>Para qué</th></tr>
+  <tr><td>Catálogo</td><td class="n">15.000</td><td>Los productos indexados</td></tr>
+  <tr><td>Consultas de desarrollo</td><td class="n">8</td><td>Ajustar y decidir. Con relevancias visibles</td></tr>
+  <tr><td>Juicios de relevancia</td><td class="n">248</td><td>La verdad de referencia sobre desarrollo</td></tr>
+  <tr><td>Consultas ciegas</td><td class="n">12</td><td>Se entregan sin conocer su respuesta</td></tr>
+  <tr><td>Altas de desarrollo / ciegas</td><td class="n">14 / 14</td><td>Calibrar y predecir duplicados</td></tr>
+  <tr><td>Eventos de catálogo</td><td class="n">24</td><td>Prueba operativa de mutación</td></tr>
+</table>
+
+<div class="key">
+  <span class="label">Hallazgo · el techo estructural</span>
+  <p>
+  Recall@10 <strong>no puede superar 0,5188</strong> con estos datos. Las ocho
+  consultas tienen una media de ~25 productos relevantes y solo hay diez
+  posiciones disponibles. Es un límite aritmético, no una carencia del sistema.
+  Sin declararlo, un Recall de 0,25 se lee como un fracaso; con él, es el 48 %
+  de todo lo alcanzable.
+  </p>
+</div>
+
+<p>
+Todo se promedia <strong>por consulta y luego entre consultas</strong>
+(macro-promedio). Promediar sobre el total de pares dejaría que las consultas
+con muchos juicios decidieran el resultado por sí solas.
+</p>
+
+<h2>3 · Alternativas probadas</h2>
+
+<h3>3.1 · Representación: cuatro configuraciones, una variable cada vez</h3>
+
+<p>
+Cada experimento cambia <strong>una sola cosa</strong> respecto al anterior, y
+todos corren contra el oráculo exacto —sin índice aproximado— para que ninguna
+diferencia pueda atribuirse al motor.
+</p>
+
+<table>
+  <tr>
+    <th>Exp</th><th>Texto codificado</th><th>Modelo</th>
+    <th class="n">nDCG@10</th><th class="n">Recall@10</th><th class="n">MRR@10</th>
+  </tr>
+  <tr><td>E0</td><td><code>text</code> completo</td><td>TF-IDF <span class="sm">(baseline)</span></td><td class="n">0,6198</td><td class="n">0,3031</td><td class="n">0,9167</td></tr>
+  <tr><td>E1</td><td><code>text</code> completo</td><td>e5-small</td><td class="n">0,6427</td><td class="n">0,2830</td><td class="n">0,8125</td></tr>
+  <tr><td>E2</td><td>título + marca + color</td><td>e5-small</td><td class="n">0,6881</td><td class="n">0,3277</td><td class="n">0,8542</td></tr>
+  <tr class="hi"><td>E3</td><td>título + marca + color</td><td>e5-base</td><td class="n">0,7072</td><td class="n">0,3648</td><td class="n">0,9375</td></tr>
+</table>
+
+<div class="key">
+  <span class="label">Hallazgo · el texto pesó más que el modelo</span>
+  <p>
+  Arreglar qué se codifica (E1→E2) aportó <strong>+0,045</strong> de nDCG.
+  Duplicar el tamaño del modelo (E2→E3) aportó <strong>+0,019</strong>: menos de
+  la mitad, a cambio de duplicar la dimensión y el coste.
+  </p>
+  <p>
+  Y algo más incómodo: <strong>E1 pierde contra el baseline léxico en Recall y
+  en MRR</strong>. Adoptar embeddings sin tocar el texto habría <em>empeorado</em>
+  el sistema. El campo <code>text</code> del catálogo mide 1.309 caracteres de
+  media y el 27 % excede la ventana de 512 tokens del modelo: se estaba
+  codificando ruido, y truncándolo.
+  </p>
+</div>
+
+<h3>3.2 · Índice: barrido de <code>ef_search</code></h3>
+
+<p>
+Los parámetros <code>m</code> y <code>ef_construct</code> gobiernan el grafo y
+cambiarlos obliga a reconstruirlo. <code>ef_search</code> es el único ajustable
+por consulta, así que es el que se barre. Fidelidad = solapamiento de IDs con el
+oráculo exacto sobre el catálogo completo.
+</p>
+
+<div class="cols">
+<div>
+<table>
+  <tr><th class="n">ef_search</th><th class="n">Fidelidad@10</th><th class="n">Orden idéntico</th></tr>
+  <tr><td class="n">16</td><td class="n">0,8500</td><td class="n">0,7000</td></tr>
+  <tr><td class="n">32</td><td class="n">0,8875</td><td class="n">0,7250</td></tr>
+  <tr><td class="n">64</td><td class="n">0,9750</td><td class="n">0,8750</td></tr>
+  <tr><td class="n">128</td><td class="n">0,9875</td><td class="n">0,9250</td></tr>
+  <tr class="hi"><td class="n">256</td><td class="n">1,0000</td><td class="n">1,0000</td></tr>
+</table>
+</div>
+<div>
+<table>
+  <tr><th>Operación</th><th class="n">p50</th></tr>
+  <tr><td>Qdrant, ef_search=16</td><td class="n">44,00 ms</td></tr>
+  <tr><td>Qdrant, ef_search=256</td><td class="n">47,16 ms</td></tr>
+  <tr class="hi"><td>Qdrant, <em>solo contar puntos</em></td><td class="n">32,64 ms</td></tr>
+  <tr><td>Oráculo NumPy, fuerza bruta</td><td class="n">18,43 ms</td></tr>
+  <tr><td>Codificar la consulta</td><td class="n">2,56 ms</td></tr>
+</table>
+</div>
+</div>
+
+<p>
+Se elige <strong>256</strong>: cuesta 3,16 ms más que 16 y compra fidelidad y
+orden perfectos. Esa tercera fila resaltada es la que explica la elección — una
+operación que <em>no busca nada</em> tarda 32,64 ms, así que el transporte HTTP
+domina la medición y la búsqueda real son unos 8 ms. Optimizar <code>ef_search</code>
+a la baja no habría comprado latencia, solo perdido precisión.
+</p>
+
+<div class="page"></div>
+
+<h3>3.3 · Duplicados: dónde poner la frontera</h3>
+
+<p>
+La regla se calibró sobre las 14 altas de desarrollo barriendo el umbral. Las
+dos clases <strong>no se solapan</strong>:
+</p>
+
+<pre>duplicados reales   [0,9484 … 0,9662]
+                              hueco de 0,0586
+productos nuevos    [0,8521 … 0,8898]
+
+umbral elegido = 0,9191   (punto medio: el margen más ancho a ambos lados)</pre>
+
+<p>
+Se probó añadir el margen respecto al segundo candidato a la regla y
+<strong>no discrimina</strong>: es igual de estrecho en ambas clases. Se
+descarta y se documenta, porque una regla más compleja sin ganancia medible es
+deuda.
+</p>
+
+<div class="key">
+  <span class="label">Hallazgo · lo decisivo no fue la regla, sino el formato</span>
+  <p>
+  Comparar el <code>text</code> en bruto de la ficha entrante contra un catálogo
+  indexado como título+marca+color compara dos cosas distintas. Al componer la
+  ficha entrante <em>igual que el catálogo</em>, la separación entre clases pasó
+  de <strong>0,0032 a 0,0586</strong>: dieciocho veces más ancha, con la misma
+  regla y el mismo modelo.
+  </p>
+</div>
+
+<h2>4 · Arquitectura final</h2>
+
+<pre>  10 ficheros CSV ──► data.py ──► text.py ──► embeddings.py
+   verificados        carga       título+      e5-base · prefijos
+   por SHA-256        validada    marca+color  query:/passage: · L2
+                                                      │
+                    ┌─────────────────────────────────┴──────────┐
+                    ▼                                            ▼
+        ┌───────────────────────┐              ┌───────────────────────┐
+        │  QdrantStore  (HNSW)  │              │  ExactStore  (NumPy)  │
+        │  aproximado · rápido  │              │  exacto · referencia  │
+        │  LO QUE SE ENTREGA    │              │  LA VARA DE MEDIR     │
+        └───────────┬───────────┘              └───────────┬───────────┘
+                    └────────────┬───────────────────────────┘
+                                 ▼   Protocol VectorStore
+                          DenseRetriever ──► duplicates · events
+                                 │           métricas · fidelidad · latencia
+                                 ▼
+                          artifacts.py  ──►  valida contra el contrato
+                                             ANTES de escribir en disco</pre>
+
+<p>
+La decisión que sostiene todo lo demás es que existan <strong>dos almacenes
+sobre exactamente los mismos vectores</strong>. Implementan el mismo
+<code>Protocol</code>, así que el código de evaluación no puede distinguirlos:
+mismo modelo, mismo texto, mismos vectores, misma métrica. Difieren solo en
+cómo encuentran los vecinos.
+</p>
+
+<p>Esa igualdad forzada convierte cualquier diferencia entre ellos en un diagnóstico:</p>
+
+<pre>el oráculo acierta y el motor no  →  la pérdida es del ÍNDICE
+los dos fallan igual              →  el problema es de REPRESENTACIÓN</pre>
+
+<h3>La colección</h3>
+
+<pre>aurum-market-catalogo
+├── vectores   768 dim · COSINE · normalizados
+├── ID         record_id = uuid5(namespace, product_id)
+│              └─ estable ⇒ reingerir SOBRESCRIBE, nunca duplica
+├── payload    product_id · title · brand · color · locale
+│              catalog_version · active     (nulos = "", nunca "nan")
+└── índices    HNSW m=24 ef_construct=120 ef_search=256
+               KEYWORD(brand) ⇒ el filtro lo resuelve el motor
+               umbrales de indexación = 1.000 KB POR SEGMENTO</pre>
+
+<div class="key">
+  <span class="label">Hallazgo · el motor respondía sin usar su índice</span>
+  <p>
+  Tras la primera ingesta, la colección estaba <code>green</code>, respondía
+  correctamente… y tenía <code>indexed_vectors_count = 0</code>. Los umbrales de
+  Qdrant se expresan en <strong>kilobytes por segmento</strong>, no en número de
+  vectores, y con el valor por defecto el grafo nunca llegaba a construirse.
+  </p>
+  <p>
+  De no haberlo detectado, <code>m</code> y <code>ef_construct</code> habrían
+  sido decoración, la fidelidad ANN habría salido trivialmente 1,0 y la latencia
+  habría medido un recorrido lineal. Por eso la verificación
+  <strong>lee la configuración de vuelta del motor</strong> en lugar de confiar
+  en lo que se le pidió.
+  </p>
+</div>
+
+<div class="page"></div>
+
+<h2>5 · Resultados</h2>
+
+<div class="cols">
+<div>
+<table>
+  <tr><th>Recuperación · desarrollo</th><th class="n">Valor</th></tr>
+  <tr><td>nDCG@10</td><td class="n">0,5422</td></tr>
+  <tr><td>Recall@10</td><td class="n">0,2481</td></tr>
+  <tr><td class="sm">…sobre un techo de</td><td class="n sm">0,5188</td></tr>
+  <tr><td>MRR@10</td><td class="n">0,9167</td></tr>
+  <tr class="hi"><td>Fidelidad ANN@10</td><td class="n">1,0000</td></tr>
+  <tr><td>Latencia p50 / p95</td><td class="n">59 / 85 ms</td></tr>
+</table>
+</div>
+<div>
+<table>
+  <tr><th>Operaciones</th><th class="n">Valor</th></tr>
+  <tr><td>Consultas filtradas conformes</td><td class="n">4 / 4</td></tr>
+  <tr><td class="sm">…productos de la marca pedida</td><td class="n sm">10/10</td></tr>
+  <tr><td>Duplicados · P / R / F1 <span class="sm">(desarrollo)</span></td><td class="n">1,0 / 1,0 / 1,0</td></tr>
+  <tr><td>Eventos aplicados</td><td class="n">24</td></tr>
+  <tr class="hi"><td>Reaplicación · estado</td><td class="n">idéntico</td></tr>
+  <tr><td>Pruebas automáticas</td><td class="n">379</td></tr>
+</table>
+</div>
+</div>
+
+<p>
+<strong>MRR de 0,9167 con nDCG de 0,5422</strong> describe un sistema con un
+perfil muy concreto: casi siempre acierta en la primera posición, y luego se
+queda corto llenando el resto del top-10. Para un buscador de comercio
+electrónico esa es la mitad buena del reparto, pero limita el descubrimiento.
+</p>
+
+<p>
+La <strong>fidelidad de 1,0</strong> tiene una consecuencia fuerte y poco
+cómoda: el índice no pierde ni un solo candidato frente al oráculo exacto, así
+que <em>ningún</em> fallo de ranking puede achacársele. Todo el error observado
+es de la representación.
+</p>
+
+<h3>Latencia, desglosada</h3>
+
+<table>
+  <tr><th>Componente</th><th class="n">p50</th><th class="n">p95</th><th>Lectura</th></tr>
+  <tr><td>Codificar la consulta</td><td class="n">0,50 ms</td><td class="n">0,97 ms</td><td>despreciable con el modelo ya cargado</td></tr>
+  <tr><td>Recorrido completo</td><td class="n">81,77 ms</td><td class="n">102,21 ms</td><td>codificación + red + búsqueda</td></tr>
+</table>
+
+<p class="sm">
+2 repeticiones de calentamiento, 5 de medida, 8 consultas · Windows 11, 8
+núcleos, Qdrant en Docker Desktop sobre WSL2 · <code>ef_search</code> = 256.
+</p>
+
+<div class="key">
+  <span class="label">Hallazgo · a esta escala el índice ANN no compensa</span>
+  <p>
+  El oráculo por fuerza bruta en NumPy resuelve la misma consulta en
+  <strong>18,43 ms</strong> frente a los 47,16 ms de Qdrant, y con precisión
+  exacta. Con 15.000 vectores de 768 dimensiones —23 MB que caben holgadamente
+  en memoria— la estructura de índice no tiene nada que ganar.
+  </p>
+  <p>
+  Esto no invalida la elección: se pedía explícitamente una base de datos
+  vectorial, y lo que Qdrant aporta —persistencia, filtrado nativo por payload,
+  mutaciones concurrentes— no lo da un array de NumPy. Pero la ventaja
+  <em>no</em> es la velocidad de búsqueda, y decirlo al revés sería falso.
+  </p>
+</div>
+
+<h2>6 · Análisis de fallos</h2>
+
+<p>
+Cinco fallos representativos, atribuidos a capa con su evidencia. Que la
+fidelidad sea 1,0 deja al índice sin responsabilidad en los fallos reales, así
+que el fallo de índice hubo que <strong>provocarlo</strong> —bajando
+<code>ef_search</code> a 16— para demostrar que el diagnóstico sabe distinguir
+esa capa.
+</p>
+
+<table>
+  <tr><th>Caso</th><th>Capa</th><th>Evidencia que lo sostiene</th></tr>
+  <tr><td>DEV-33633</td><td>representación</td><td>nDCG 0,238. El oráculo exacto recupera los <em>mismos</em> 2 relevantes que el motor</td></tr>
+  <tr><td>DEV-31224</td><td>representación</td><td>nDCG 0,362. Motor y oráculo coinciden en 3 de 15 relevantes</td></tr>
+  <tr><td>DEV-38249</td><td>representación</td><td>nDCG 0,379 con 35 relevantes juzgados. Idéntico en ambos</td></tr>
+  <tr><td>DEV-28703</td><td>índice <span class="sm">(provocado)</span></td><td>Con ef_search=16 se pierden 3 productos que el oráculo sí encuentra</td></tr>
+  <tr><td>EVAL-DUP-004</td><td>datos / umbral</td><td>score 0,8907 &lt; umbral 0,9191, pero <em>dentro</em> del hueco de desarrollo</td></tr>
+</table>
+
+<div class="key">
+  <span class="label">Hallazgo · el sistema se degrada justo donde debería brillar</span>
+  <p>
+  <code>"taladro 24v batería"</code> devuelve taladros. Su paráfrasis
+  <code>"quiero una herramienta inalámbrica potente para perforar sin depender
+  de un enchufe"</code> devuelve <em>guantes y estanterías de cocina</em>.
+  </p>
+  <p>
+  El diagnóstico se hizo por eliminación: existen 70 taladros en el catálogo,
+  los prefijos <code>query:</code>/<code>passage:</code> se aplican
+  correctamente, y <strong>el oráculo exacto falla igual</strong>. No es el
+  índice ni la configuración: el modelo no acerca esa paráfrasis a las fichas.
+  Codificar solo título+marca+color mejoró las métricas globales y, a la vez,
+  eliminó el contexto que una consulta descriptiva necesita.
+  </p>
+  <p>
+  <strong>No se corrigió deliberadamente.</strong> Ajustar la representación
+  contra las consultas de evaluación sería optimizar sobre el examen.
+  </p>
+</div>
+
+<div class="page"></div>
+
+<h3>Duplicados sobre el conjunto ciego</h3>
+
+<p>
+Con el umbral congelado antes de ver un solo caso: <strong>13 aciertos de
+14</strong>. Los 7 productos nuevos se clasificaron correctamente y 6 de los 7
+duplicados se detectaron.
+</p>
+
+<p>
+El fallo, <code>EVAL-DUP-004</code>, puntuó <strong>0,8907</strong> — por debajo
+del umbral, pero <em>dentro</em> del hueco [0,8898 – 0,9484] que en desarrollo
+estaba vacío. No es un error de la regla: es la prueba de que
+<strong>catorce casos son demasiado pocos</strong> para fijar una frontera, por
+limpia que parezca la separación. El umbral no se retocó al descubrirlo, porque
+hacerlo habría invalidado la evaluación.
+</p>
+
+<h2>7 · Recomendación</h2>
+
+<p>
+El sistema es apto para producción en el recorrido de <strong>duplicados</strong>
+y apto con reservas en el de <strong>búsqueda</strong>.
+</p>
+
+<table>
+  <tr><th>Recorrido</th><th>Veredicto</th><th>Condición</th></tr>
+  <tr><td>Control de altas duplicadas</td><td><strong>Desplegable</strong></td><td>Revisión humana en la banda 0,88–0,95, donde vive el único fallo observado</td></tr>
+  <tr><td>Búsqueda por palabras cercanas al catálogo</td><td><strong>Desplegable</strong></td><td>MRR 0,92: el primer resultado acierta</td></tr>
+  <tr><td>Búsqueda por descripción libre</td><td><strong>No desplegable</strong></td><td>Falla de forma visible y vergonzante ante paráfrasis</td></tr>
+</table>
+
+<h3>Qué haría a continuación, por orden de retorno</h3>
+
+<ul>
+  <li><strong>Enriquecer el texto codificado sin devolver el ruido.</strong> El
+  salto de <code>text</code> a título+marca+color arregló las métricas y rompió
+  las consultas descriptivas. Lo siguiente es una composición intermedia —título
+  + marca + color + las primeras características, con el keyword-stuffing
+  filtrado— evaluada con el mismo protocolo. Es donde el proyecto ya demostró
+  que está la mayor ganancia por euro invertido.</li>
+
+  <li><strong>Recuperación híbrida.</strong> TF-IDF gana al sistema denso en
+  MRR sobre estas consultas. Fusionar ambos rankings recupera lo que cada uno
+  ve y el otro no, sin cambiar de modelo ni reingerir.</li>
+
+  <li><strong>Ampliar el conjunto de calibración de duplicados.</strong> Catorce
+  casos no bastan; con cincuenta, el umbral dejaría de ser una interpolación
+  entre dos nubes pequeñas.</li>
+
+  <li><strong>Medir con consultas reales de los clientes.</strong> Las ocho de
+  desarrollo son cortas y léxicas, lo que favorece al baseline y esconde
+  exactamente el fallo que el sistema tiene.</li>
+</ul>
+
+<h3>Qué cambiaría con un catálogo diez veces mayor</h3>
+
+<table>
+  <tr><th>Dimensión</th><th>Hoy · 15.000</th><th>150.000</th></tr>
+  <tr><td>Memoria de vectores</td><td>23 MB</td><td>~230 MB · sigue cabiendo en RAM</td></tr>
+  <tr><td>Codificación inicial</td><td>~12 min en CPU</td><td>~2 h en CPU · <strong>pasa a GPU o a lotes nocturnos</strong></td></tr>
+  <tr><td>Fuerza bruta</td><td>18 ms · más rápida que el índice</td><td>~180 ms · <strong>deja de ser viable</strong></td></tr>
+  <tr><td>Índice HNSW</td><td>No aporta velocidad</td><td><strong>Se vuelve imprescindible</strong></td></tr>
+  <tr><td>Cuello de botella</td><td>Transporte HTTP (32 de 47 ms)</td><td>La búsqueda · el transporte deja de dominar</td></tr>
+  <tr><td>Latencia p50</td><td>59 ms</td><td>~70–90 ms si <code>ef_search</code> se mantiene</td></tr>
+</table>
+
+<p>
+La conclusión operativa es que <strong>la arquitectura elegida está
+dimensionada para el catálogo que viene, no para el de hoy</strong>. A la escala
+actual el índice no aporta velocidad; a 150.000 productos es la única opción
+viable, y el trabajo de calibrarlo ya está hecho y medido. Lo que sí cambia de
+naturaleza es la codificación: doce minutos son un inconveniente, dos horas son
+una decisión de infraestructura.
+</p>
+
+<div class="key">
+  <span class="label">Lo que este proyecto demuestra más allá de las cifras</span>
+  <p>
+  Tres de los cuatro hallazgos con más valor fueron incómodos: los embeddings
+  empeoraron el sistema antes de mejorarlo, el motor respondía sin usar su
+  índice con todos los indicadores en verde, y el índice que se pedía no aporta
+  velocidad a esta escala. Ninguno se habría visto sin un oráculo exacto contra
+  el que comparar y sin declarar el techo de cada métrica.
+  </p>
+  <p>
+  Un sistema que funciona sin saber por qué no es reproducible. Ese, y no el
+  nDCG, es el resultado que se entrega.
+  </p>
+</div>
+
+<footer>
+  Los tres artefactos de entrega, la configuración congelada
+  (<code>config/final.yaml</code>), los ocho ADR y las 379 pruebas están en el
+  repositorio. Toda cifra de este informe procede de un artefacto generado por
+  <code>uv run aurum deliver</code>; ninguna se escribió a mano.
+</footer>
+
+</body>
+</html>
