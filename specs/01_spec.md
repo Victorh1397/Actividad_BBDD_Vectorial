@@ -169,7 +169,7 @@ marca ([P-09](00_constitution.md)).
 
 - Las 4 consultas de `consultas_filtradas.csv` devuelven **exclusivamente** la
   marca pedida.
-- **Verificación:** `tests/test_search.py::test_filtered_queries_never_leak_other_brands` *(punto 2 de "Antes de entregar")*
+- **Verificación:** `tests/test_search.py::test_filtered_search_never_leaks_another_brand` *(punto 2 de "Antes de entregar")*
 
 #### RF-15 · Casos límite tratados explícitamente
 | Situación | Comportamiento exigido |
@@ -295,7 +295,7 @@ Los siete puntos del enunciado, cada uno con el test que lo cierra:
 | # | Punto del enunciado | RF | Test |
 |---|---|---|---|
 | 1 | La ingesta completa puede repetirse sin aumentar el recuento | RF-09 | `test_double_ingest_keeps_count` |
-| 2 | Las consultas filtradas nunca devuelven otra marca | RF-14 | `test_filtered_queries_never_leak_other_brands` |
+| 2 | Las consultas filtradas nunca devuelven otra marca | RF-14 | `test_filtered_search_never_leaks_another_brand` |
 | 3 | Los eventos dejan exactamente el estado esperado | RF-16 | `test_events_are_idempotent` |
 | 4 | Los rankings ciegos contienen diez IDs únicos y válidos | RF-25 | `test_blind_rankings_have_ten_unique_valid_ids` |
 | 5 | La detección de duplicados señala un candidato cuando predice positivo | RF-17 | `test_positive_prediction_names_a_candidate` |
@@ -310,7 +310,8 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 8 · 379 tests en verde.
+**Última actualización:** cierre de la Fase 9 · **los 29 requisitos cerrados**,
+los 7 puntos de la checklist verificados y 379 tests en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
@@ -318,7 +319,7 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-02 | **`cerrado`** | Baseline TF-IDF evaluado con las mismas métricas, consultas y texto que el sistema denso: `E0` con nDCG@10 0,6198. Pliega acentos, imprescindible en español. |
 | RF-03 | **`cerrado`** | Tres estrategias implementadas y documentadas en `text.py`; saneado en un único punto con 9 casos en `test_data_integrity.py` y las 44 marcas / 549 colores ausentes verificados. |
 | RF-04 | **`cerrado`** | Prefijos `query:`/`passage:` aplicados solo a modelos E5, idempotentes; vectores L2 y `float32` verificados contra el modelo real (`test_embeddings.py`). |
-| RF-05 | `parcial` | Razonado en [02_plan.md](02_plan.md) §3 y comprobado en código: `ExactVectorStore` rechaza vectores sin normalizar porque el producto interno dejaría de ser el coseno. Falta llevarlo al informe. |
+| RF-05 | **`cerrado`** | La cadena normalización → métrica → significado documentada en [docs/arquitectura.md](../docs/arquitectura.md) §5: con ‖v‖=1 el coseno **es** el producto escalar, de ahí la escala [-1,1] y de ahí que el umbral 0,9191 solo tenga sentido dentro de ella. Comprobado en código: `ExactVectorStore` rechaza vectores sin normalizar y `SearchHit` rechaza una distancia declarada como "mayor es mejor". |
 | RF-06 | **`cerrado`** | Cuatro configuraciones que aíslan una variable cada una, con análisis en [ADR-005](decisiones/ADR-005-modelo-de-embeddings.md). Artefactos en `.artifacts/experiments/E{0..3}.json`, validados contra su contrato. |
 | RF-07 | **`cerrado`** | Colección verificada en vivo: 15.000 puntos, dimensión 768, distancia `Cosine`, ID = `record_id`, payload uniforme con índice `KEYWORD` sobre `brand`. |
 | RF-08 | **`cerrado`** | `m=24` y `ef_construct=120` **leídos de vuelta del motor**, umbrales de indexación explícitos ([ADR-006](decisiones/ADR-006-umbrales-de-indexacion.md)) y barrido de `ef_search` sobre el catálogo completo: 0,85 → 1,00 de fidelidad entre 16 y 256 ([ADR-007](decisiones/ADR-007-ef-search.md)). |
@@ -338,11 +339,11 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-22 | **`cerrado`** | Las 4 consultas filtradas: 10/10 de la marca en todas. |
 | RF-23 | **`cerrado`** | Sobre desarrollo: precision 1,0 · recall 1,0 · F1 1,0 · TP=7 FP=0 TN=7 FN=0. Falsos positivos y negativos analizados por separado con su coste de negocio en `error_analysis` y en [ADR-008](decisiones/ADR-008-umbral-de-duplicados.md). |
 | RF-24 | **`cerrado`** | Cinco fallos atribuidos en `.artifacts/attribution.json`, cubriendo **tres capas**: representación (3), índice (1) y datos (1). Cada uno con su evidencia; el de índice se provoca bajando `ef_search` a 16, porque con la configuración entregada la fidelidad es 1,0 y ningún fallo real sería suyo. |
-| RF-25 | **`cerrado`** | Los tres artefactos escritos y validados contra su contrato **antes** de tocar disco, y re-validados al leerlos: 120 filas / 12 consultas, 14 decisiones, y las métricas mínimas. Falta el diagrama de arquitectura (Fase 9). |
-| RF-26 | `pendiente` | — |
+| RF-25 | **`cerrado`** | Los tres artefactos escritos y validados contra su contrato **antes** de tocar disco, y re-validados al leerlos: 120 filas / 12 consultas, 14 decisiones, y las métricas mínimas. Diagrama de arquitectura en [docs/arquitectura.md](../docs/arquitectura.md) y configuración congelada en `config/final.yaml`. |
+| RF-26 | **`cerrado`** | [README.md](../README.md) con requisitos, instalación, variables, comandos, tiempos —distinguiendo lo cronometrado de lo estimado— y ocho fallos previsibles con su causa y su solución. Cada enlace y cada cifra verificados contra el repositorio. |
 | RF-27 | **`cerrado`** | 379 tests cubren IDs, batching, filtros nativos, mutaciones de la colección y formato de resultados, más los siete puntos de la checklist en `test_entrega.py`. |
 | RF-28 | **`cerrado`** | `aurum deliver` regenera los tres artefactos en un solo comando, y un test verifica que **no** aplica los eventos, cosa que ninguna salida delataría. *(Punto 6 de la checklist)* |
-| RF-29 | `pendiente` | — |
+| RF-29 | **`cerrado`** | Informe de **8 páginas** en `docs/informe/informe.pdf`, bajo el límite de 10: problema, método de medición, alternativas contrastadas, arquitectura, resultados, atribución de fallos y recomendación de escalado. Regenerable con `make informe`, que además **falla** si el documento excede el límite. |
 
 ### Hallazgos de la Fase 8
 

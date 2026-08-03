@@ -16,8 +16,8 @@ evidencia observable.
 | T-002 | `pyproject.toml`, `.python-version`, `.env.example`, `Makefile` | — | raíz | `make setup` | `[x]` |
 | T-003 | Compose de Qdrant con prefijo `aurum-market` | RF-18 | `deploy/qdrant/compose.yaml` | `make up` con healthcheck | `[x]` |
 | T-004 | `.gitignore`: `.artifacts/`, `datos/profesorado/`, volúmenes | RF-18 | `.gitignore` | `test_repository_has_no_secrets_or_reserved_data` | `[x]` |
-| T-005 | `config.py` con carga y validación de `.env` | RF-18 | `src/aurum_market/config.py` | `test_config_rejects_invalid_settings` | `[ ]` |
-| T-006 | `aurum doctor`: Python, `.env`, datos, checksums, Qdrant | RF-10, RF-26 | `cli.py` | `uv run aurum doctor` en verde | `[ ]` |
+| T-005 | `config.py` con carga y validación de `.env` | RF-18 | `src/aurum_market/config.py` | `test_rejects_invalid_settings` | `[x]` |
+| T-006 | `aurum doctor`: Python, `.env`, datos, checksums, Qdrant | RF-10, RF-26 | `cli.py` | `uv run aurum doctor` en verde | `[x]` |
 
 ## Fase 1 · Especificación
 
@@ -25,7 +25,7 @@ evidencia observable.
 |---|---|---|---|---|---|
 | T-010 | Constitución del proyecto | — | `specs/00_constitution.md` | revisión | `[x]` |
 | T-011 | Especificación RF-01..RF-29 | — | `specs/01_spec.md` | los 7 puntos de entrega trazados | `[x]` |
-| T-012 | Contratos JSON | RF-25 | `specs/contracts/*.json` | `test_artifacts_validate_against_contracts` | `[x]` |
+| T-012 | Contratos JSON | RF-25 | `specs/contracts/*.json` | `test_all_three_artifacts_validate_against_their_contracts` | `[x]` |
 | T-013 | Plan técnico | — | `specs/02_plan.md` | revisión | `[x]` |
 | T-014 | Tablero de tareas | — | `specs/03_tasks.md` | este fichero | `[x]` |
 | T-015 | ADR-001..004 | — | `specs/decisiones/` | revisión | `[x]` |
@@ -135,11 +135,12 @@ volver al estado base exige reingerir.*
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-090 | Diagrama de arquitectura | RF-25 | `docs/arquitectura.md` | revisión | `[ ]` |
-| T-091 | README con tiempos y fallos previsibles | RF-26 | `README.md` | ejecución en clon limpio | `[ ]` |
-| T-092 | Informe PDF ≤10 páginas | RF-29 | `docs/informe/` | revisión | `[ ]` |
-| T-093 | Auditoría final: sin claves, volúmenes ni datos reservados | RF-18 | — | **`test_repository_has_no_secrets_or_reserved_data`** | `[ ]` |
-| T-094 | Actualizar la tabla de estado de `01_spec.md` | — | `specs/01_spec.md` | los 29 RF en `cerrado` | `[ ]` |
+| T-090 | Diagrama de arquitectura | RF-25 | `docs/arquitectura.md` | revisión | `[x]` |
+| T-091 | README con tiempos y fallos previsibles | RF-26 | `README.md` | enlaces y cifras verificados contra el repositorio | `[x]` |
+| T-092 | Informe PDF ≤10 páginas | RF-29 | `docs/informe/` | `make informe` · 8 páginas, falla si excede | `[x]` |
+| T-093 | Auditoría final: sin claves, volúmenes ni datos reservados | RF-18 | — | **`test_repository_has_no_secrets_or_reserved_data`** | `[x]` |
+| T-094 | Actualizar la tabla de estado de `01_spec.md` | — | `specs/01_spec.md` | los 29 RF en `cerrado` | `[x]` |
+| T-095 | Documentar métrica ↔ normalización ↔ significado del score | RF-05 | `docs/arquitectura.md` | revisión | `[x]` |
 
 ---
 

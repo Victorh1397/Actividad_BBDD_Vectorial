@@ -173,7 +173,63 @@ Dos salvaguardas viven en ese camino:
 
 ---
 
-## 5. Módulos
+## 5. Qué significa exactamente el número que devuelve el motor
+
+Tres decisiones encadenadas determinan qué es un score de `0,8784`, y conviene
+verlas juntas porque **cambiar una invalida la lectura de las otras**.
+
+### La cadena
+
+```
+1. NORMALIZACIÓN   cada vector se divide por su norma  ⇒  ‖v‖ = 1
+                   (normalize_embeddings=True, verificado en los tests)
+        │
+2. MÉTRICA         la colección se declara con distancia COSINE
+        │
+3. SIGNIFICADO     con vectores unitarios,  cos(a,b) = a · b
+                   el score ES el producto escalar, en el rango [-1, 1]
+```
+
+Con vectores de norma 1, el coseno y el producto escalar **son el mismo
+número**. Esa equivalencia es la que permite que el oráculo exacto sea una
+multiplicación de matrices de cinco líneas y siga siendo comparable con Qdrant
+punto por punto.
+
+### La escala, leída
+
+| Score | Qué significa |
+|---|---|
+| `1,0` | Vectores idénticos: el mismo texto |
+| `0,95` | Prácticamente el mismo producto — es la banda de los duplicados |
+| `0,85` | Mismo tipo de producto, ficha distinta |
+| `0,0` | Ortogonales: sin relación |
+| `< 0` | Posible en teoría; no ocurre con embeddings de texto en la práctica |
+
+Que el umbral de duplicados sea `0,9191` solo tiene sentido dentro de esta
+escala. Con distancia euclídea el mismo par de productos daría un número
+distinto, con **orden invertido** —menor sería mejor— y el umbral no solo
+cambiaría de valor: cambiaría de dirección.
+
+### Por qué el sistema no deja convertir en silencio
+
+Un score de similitud y una distancia son ambos «un float», y nada en el tipo
+`float` impide promediarlos, ordenarlos al revés o compararlos entre sí. Por eso
+el score viaja siempre acompañado:
+
+```python
+SearchHit(native_score=0.8784, score_kind="similarity", higher_is_better=True)
+
+SearchHit(native_score=0.12, score_kind="distance", higher_is_better=True)
+# → ContractError: score_kind='distance' implica higher_is_better=False
+```
+
+Y por eso el valor llega a `resultados_busqueda.csv` **sin reescalar**: cualquier
+transformación —normalizar a [0,1], convertir a porcentaje— perdería la relación
+con la métrica declarada y haría el número incomparable con el de otro sistema.
+
+---
+
+## 6. Módulos
 
 | Módulo | Responsabilidad | RF |
 |---|---|---|
@@ -196,7 +252,7 @@ Dos salvaguardas viven en ese camino:
 
 ---
 
-## 6. El orden de ejecución no es libre
+## 7. El orden de ejecución no es libre
 
 ```
 1. ingest      →  2. verify   →  3. experiment  →  4. duplicates calibrate
@@ -217,7 +273,7 @@ contrario. La justificación completa está en
 
 ---
 
-## 7. Dónde acaban los resultados
+## 8. Dónde acaban los resultados
 
 ```
 resultados/
