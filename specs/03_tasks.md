@@ -99,12 +99,13 @@ evidencia observable.
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-060 | Generación de candidatos top-2 vía base vectorial | RF-17 | `duplicates.py` | `test_candidates_come_from_the_vector_store` | `[ ]` |
-| T-061 | Regla score + margen (+ marca / léxico si aporta) | RF-17 | `duplicates.py` | `test_rule_is_deterministic` | `[ ]` |
-| T-062 | Barrido de umbral sobre desarrollo + precision/recall/F1 | RF-23 | `duplicates.py` | `aurum duplicates calibrate` | `[ ]` |
-| T-063 | Congelar umbral en `config/final.yaml` | RF-17 | `config/final.yaml` | revisión antes de predecir | `[ ]` |
-| T-064 | Análisis separado de FP y FN con coste de negocio | RF-23 | informe | sección del informe | `[ ]` |
-| T-065 | Predicción sobre `altas_evaluacion.csv` | RF-17 | `duplicates.py` | **`test_positive_prediction_names_a_candidate`** | `[ ]` |
+| T-060 | Generación de candidatos top-2 vía base vectorial | RF-17 | `duplicates.py` | `test_candidates_come_from_the_vector_store` | `[x]` |
+| T-061 | Regla de decisión y formato de la consulta | RF-17 | `duplicates.py` | `test_the_rule_is_deterministic` | `[x]` |
+| T-062 | Barrido de umbral sobre desarrollo + precision/recall/F1 | RF-23 | `duplicates.py` | F1 = 1,0 con TP=7 FP=0 TN=7 FN=0 | `[x]` |
+| T-063 | Congelar umbral en `config/final.yaml` | RF-17 | `config/final.yaml` | 0,9191 fijado antes de predecir | `[x]` |
+| T-064 | Análisis separado de FP y FN con coste de negocio | RF-23 | `duplicates.py`, [ADR-008](decisiones/ADR-008-umbral-de-duplicados.md) | `test_explains_what_each_error_costs` | `[x]` |
+| T-065 | Predicción sobre `altas_evaluacion.csv` | RF-17 | `duplicates.py` | **`test_positive_prediction_names_a_candidate`** | `[x]` |
+| T-066 | ADR-008 con la regla y su justificación | RF-17, RF-23 | `specs/decisiones/` | revisión | `[x]` |
 
 ## Fase 7 · Evaluación y artefactos
 

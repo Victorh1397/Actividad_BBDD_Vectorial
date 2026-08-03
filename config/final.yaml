@@ -56,10 +56,22 @@ ingestion:
   batch_size: 256
 
 # --- Duplicados ---------------------------------------------------------------
-# Se calibra en la Fase 6 y se congela aquí antes de tocar altas_evaluacion.csv
-# (P-04). Hasta entonces queda declarado como pendiente, no con un valor
-# provisional que pudiera colarse en una ejecución.
+# CONGELADO. Calibrado con altas_desarrollo.csv y fijado ANTES de ejecutar una
+# sola predicción sobre altas_evaluacion.csv (P-04). Reajustarlo después de ver
+# el conjunto ciego invalidaría la evaluación.
 duplicates:
-  threshold: null
-  margin: null
-  calibrated_on: null
+  threshold: 0.9191
+  calibrated_on: altas_desarrollo.csv
+  calibrated_at: "2026-08-02"
+  # La ficha entrante se compone igual que el catálogo: comparar su `text` en
+  # bruto contra un catálogo indexado como title+brand+color compara cosas
+  # distintas. Alinear ambos lados multiplica por 18 la separación.
+  query_text_strategy: title_brand_color
+  candidates_per_listing: 2
+  # Resultado sobre desarrollo con este umbral:
+  #   precision 1.0 · recall 1.0 · F1 1.0 · TP=7 FP=0 TN=7 FN=0
+  #   duplicados [0.9484, 0.9662] · nuevos [0.8521, 0.8898] · hueco 0.0586
+  # Las clases no se solapan, así que cualquier umbral dentro del hueco acierta
+  # en desarrollo: se toma el punto medio por dejar el margen más ancho a ambos
+  # lados para casos no vistos. Ver ADR-008.
+  margin_used_in_rule: false
