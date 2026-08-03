@@ -610,6 +610,156 @@ def evaluate(
     typer.echo(f"\nEvidencia escrita en {path}")
 
 
+duplicates_app = typer.Typer(
+    help="Control de altas potencialmente duplicadas (RF-17, RF-23).",
+    no_args_is_help=True,
+)
+app.add_typer(duplicates_app, name="duplicates")
+
+
+@duplicates_app.command("calibrate")
+def duplicates_calibrate(
+    steps: int = typer.Option(200, "--steps", help="Resolución del barrido."),
+) -> None:
+    """Calibra el umbral con altas_desarrollo.csv y lo propone.
+
+    Nunca mira altas_evaluacion.csv: el umbral debe fijarse antes de ver el
+    conjunto ciego (P-04).
+    """
+    import json
+
+    from .config import ARTIFACTS_DIRECTORY
+    from .data import load_incoming_listings
+    from .duplicates import calibrate, error_analysis, gather_evidence
+    from .search import build_live_retriever
+
+    settings = load_settings()
+    strategy = (
+        _load_final_config()
+        .get("representation", {})
+        .get("text_strategy", "title_brand_color")
+    )
+    retriever = build_live_retriever(settings)
+    listings = load_incoming_listings("desarrollo")
+    typer.echo(f"{len(listings)} altas etiquetadas · texto {strategy}\n")
+
+    evidences = gather_evidence(retriever, listings, strategy=strategy)
+    result = calibrate(evidences, strategy=strategy, steps=steps)
+
+    typer.echo(f"{'alta':<14} {'etiqueta':<9} {'score':>7} {'margen':>8}  candidato")
+    typer.echo("-" * 92)
+    for evidence in evidences:
+        listing = evidence.listing
+        best = evidence.best
+        expected = listing.reference_product_id or "—"
+        found = best.product_id if best else "—"
+        mark = (
+            ""
+            if found == expected or not listing.is_duplicate
+            else f"  (esperado {expected})"
+        )
+        typer.echo(
+            f"{listing.incoming_id:<14} {listing.is_duplicate!s:<9} "
+            f"{evidence.score:>7.4f} {(evidence.margin or 0):>8.4f}  {found}{mark}"
+        )
+
+    typer.echo("")
+    typer.secho(f"Umbral propuesto: {result.threshold:.4f}", bold=True)
+    for note in result.notes:
+        typer.echo(f"  {note}")
+
+    analysis = error_analysis(evidences, threshold=result.threshold)
+    metrics = analysis["metrics"]
+    typer.echo(
+        f"\n  precision={metrics['precision']:.4f}  recall={metrics['recall']:.4f}  "
+        f"F1={metrics['f1']:.4f}"
+    )
+    typer.echo(
+        f"  TP={metrics['true_positives']} FP={metrics['false_positives']} "
+        f"TN={metrics['true_negatives']} FN={metrics['false_negatives']}"
+    )
+    if metrics["wrong_candidate"]:
+        typer.secho(
+            f"  {metrics['wrong_candidate']} positivo(s) señalan otro producto",
+            fg=typer.colors.YELLOW,
+        )
+
+    path = ARTIFACTS_DIRECTORY / "duplicates_calibration.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"calibration": result.as_dict(), "error_analysis": analysis},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"\nEvidencia en {path}")
+    typer.secho(
+        f"\nCongela el umbral en config/final.yaml antes de predecir:\n"
+        f"  duplicates.threshold: {result.threshold:.4f}",
+        fg=typer.colors.CYAN,
+    )
+
+
+@duplicates_app.command("predict")
+def duplicates_predict(
+    split: str = typer.Option("evaluacion", "--split", help="desarrollo o evaluacion."),
+) -> None:
+    """Decide sobre las altas usando el umbral congelado en config/final.yaml."""
+    import json
+
+    from .config import ARTIFACTS_DIRECTORY
+    from .data import load_incoming_listings
+    from .duplicates import gather_evidence, predict
+    from .search import build_live_retriever
+
+    settings = load_settings()
+    final = _load_final_config()
+    threshold = final.get("duplicates", {}).get("threshold")
+    if threshold is None:
+        typer.secho(
+            "config/final.yaml no declara duplicates.threshold. Ejecuta primero "
+            "`aurum duplicates calibrate` y congela el valor.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    strategy = final.get("representation", {}).get("text_strategy", "title_brand_color")
+    retriever = build_live_retriever(settings)
+    listings = load_incoming_listings(split)  # type: ignore[arg-type]
+    typer.echo(f"{len(listings)} altas · umbral congelado {threshold:.4f}\n")
+
+    evidences = gather_evidence(retriever, listings, strategy=strategy)
+    decisions = predict(evidences, threshold=threshold)
+
+    typer.echo(f"{'alta':<14} {'duplicado':<10} {'score':>7}  candidato")
+    typer.echo("-" * 74)
+    for decision in decisions:
+        typer.echo(
+            f"{decision.incoming_id:<14} "
+            f"{'SÍ' if decision.predicted_duplicate else 'no':<10} "
+            f"{decision.score:>7.4f}  {decision.matched_product_id or '—'}"
+        )
+
+    positives = sum(1 for d in decisions if d.predicted_duplicate)
+    typer.echo(f"\n{positives} duplicados de {len(decisions)} altas")
+
+    path = ARTIFACTS_DIRECTORY / f"duplicates_{split}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"threshold": threshold, "decisions": [d.as_row() for d in decisions]},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"Evidencia en {path}")
+
+
 @app.command()
 def reset() -> None:
     """Borra la colección. Destructivo y desactivado por defecto (RF-18)."""
