@@ -165,7 +165,7 @@ eventos van al final, porque son los únicos que modifican la colección.
 5. evaluate                   nDCG/Recall/MRR, fidelidad ANN, latencia
 6. duplicates predict         altas_evaluacion.csv con el umbral congelado
 7. deliver                    los tres artefactos
-8. events --apply --verify    prueba operativa aislada: idempotencia y visibilidad
+8. events --apply --twice      prueba operativa aislada: idempotencia y visibilidad
 ```
 
 **Por qué importa** (y es la trampa fina de esta actividad): los 24 eventos están
@@ -190,6 +190,12 @@ frente a `EVAL-100455-direct` "taladro 24v batería") para que la visibilidad de
 un alta pueda comprobarse con una **búsqueda semántica real** y no solo con una
 lectura por ID.
 
+Confirmado tras aplicarlos: `aurum search "taladro 24v batería"` devuelve
+`AURUM-NEW-001` en **posición 1** con 0,8784, por delante de los taladros reales
+del catálogo, y `"silla ergonómica de oficina con apoyo lumbar"` devuelve
+`AURUM-NEW-002` con 0,9096. Un alta no solo queda escrita: queda **encontrable
+por una consulta que nadie le enseñó**.
+
 **Consecuencia operativa:** el paso 8 modifica la colección de forma
 irreversible, así que repetir el recorrido completo exige reingerir desde cero.
 `aurum deliver` cubre los pasos 1 a 7 y nunca aplica eventos.
@@ -209,7 +215,7 @@ La justificación completa, con las citas del enunciado que la sostienen, está 
 | `aurum verify` | Recuento y estado de indexación. |
 | `aurum search "consulta" [--brand M] [--top-k N]` | Búsqueda ad-hoc para inspección manual. |
 | `aurum experiment [--profile]` | Matriz E0–E3 con el oráculo exacto. |
-| `aurum events --apply --verify` | Aplica los 24 eventos y mide visibilidad. |
+| `aurum events [--apply] [--twice]` | Sin `--apply` solo clasifica: no escribe nada. Con él aplica los 24 eventos por `sequence` y sondea la visibilidad de cada tipo; `--twice` reaplica y compara el estado. |
 | `aurum duplicates calibrate` | Barrido de umbral sobre desarrollo. |
 | `aurum duplicates predict` | Decisiones sobre evaluación con el umbral congelado. |
 | `aurum evaluate [--sweep-ef]` | Métricas, fidelidad ANN y latencia. |

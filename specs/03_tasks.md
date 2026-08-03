@@ -126,9 +126,10 @@ volver al estado base exige reingerir.*
 
 | ID | Tarea | RF | Ficheros | Cierra con | Estado |
 |---|---|---|---|---|---|
-| T-080 | Aplicar 24 eventos por `sequence`, distinguiendo tipos | RF-16 | `events.py` | `test_events_apply_in_sequence_order` | `[ ]` |
-| T-081 | Idempotencia de la reaplicación | RF-16 | `events.py` | **`test_events_are_idempotent`** | `[ ]` |
-| T-082 | Visibilidad por ID y por búsqueda, con espera acotada | RF-16 | `events.py` | `test_visibility_after_each_operation_type` | `[ ]` |
+| T-080 | Aplicar 24 eventos por `sequence`, distinguiendo tipos | RF-16 | `events.py`, `cli.py` | `test_events_apply_in_sequence_order` | `[x]` |
+| T-081 | Idempotencia de la reaplicación | RF-16 | `events.py` | **`test_events_are_idempotent`** | `[x]` |
+| T-082 | Visibilidad por ID y por búsqueda, con espera acotada | RF-16 | `events.py` | `test_every_kind_becomes_visible_through_both_channels` | `[x]` |
+| T-083 | Salida de la CLI a prueba de consolas sin UTF-8 | RF-26 | `cli.py` | `aurum events --apply` completa en cp1252 | `[x]` |
 
 ## Fase 9 · Informe y cierre
 
@@ -151,11 +152,13 @@ Las **negritas** de la columna "Cierra con" son los siete puntos de la checklist
 |---|---|---|
 | La ingesta repetida no aumenta el recuento | T-042 | `[x]` |
 | Las consultas filtradas nunca devuelven otra marca | T-051 | `[x]` |
-| Los eventos dejan exactamente el estado esperado | T-081 | `[ ]` |
+| Los eventos dejan exactamente el estado esperado | T-081 | `[x]` |
 | Los rankings ciegos: diez IDs únicos y válidos | T-071 | `[x]` |
 | Un positivo de duplicados señala su candidato | T-065 | `[x]` |
 | Las métricas se regeneran con un único comando | T-073 | `[x]` |
 | Sin claves, volúmenes ni datos reservados | T-044, T-093 | `[x]` |
 
-**Seis de siete.** Solo queda el de los eventos, que es precisamente la Fase 8.
+**Los siete en verde.** El último, el de los eventos, se cerró en la Fase 8: los
+24 aplicados por `sequence` dejan `8 altas · 8 actualizaciones · 8 bajas`, y una
+segunda pasada informa `0 altas · 0 bajas efectivas` con el estado idéntico.
 Todos se ejecutan con `uv run pytest tests/test_entrega.py`.

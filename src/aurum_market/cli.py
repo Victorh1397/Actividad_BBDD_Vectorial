@@ -27,6 +27,14 @@ OK = "  OK  "
 FAIL = " FALLO"
 WARN = " AVISO"
 
+# La consola de Windows abre en cp1252, donde no existen caracteres como "→", y
+# `print` levanta UnicodeEncodeError: un comando muere por cómo escribe su
+# salida y no por lo que hace. Degradar el carácter a "?" siempre es preferible
+# a abortar un trabajo ya terminado (RF-26).
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
+
 
 def _line(status: str, message: str, detail: str = "") -> None:
     suffix = f" — {detail}" if detail else ""
@@ -251,7 +259,7 @@ def experiment(
         typer.echo(
             f"  nDCG@{top_k}={result.report.mean_ndcg:.4f}  "
             f"Recall@{top_k}={result.report.mean_recall:.4f}  "
-            f"MRR@{top_k}={result.report.mean_mrr:.4f}   → {path.name}\n"
+            f"MRR@{top_k}={result.report.mean_mrr:.4f}   -> {path.name}\n"
         )
         results.append(result)
 
@@ -960,6 +968,151 @@ def deliver(
     )
     typer.echo(f"\nArtefactos en {RESULTS_DIRECTORY}")
     typer.secho("Entrega regenerada.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def events(
+    apply: bool = typer.Option(
+        False, "--apply", help="Aplica los eventos. Sin este flag solo los clasifica."
+    ),
+    verify_visibility: bool = typer.Option(
+        True, "--verify/--no-verify", help="Sonda una operación de cada tipo (RF-16)."
+    ),
+    twice: bool = typer.Option(
+        False, "--twice", help="Aplica el fichero dos veces y compara el estado."
+    ),
+    timeout: float = typer.Option(
+        30.0, "--timeout", help="Plazo de espera en segundos."
+    ),
+) -> None:
+    """Aplica los 24 eventos de catálogo en orden de `sequence` (RF-16).
+
+    IRREVERSIBLE y por eso va al final del recorrido: los 8 DELETE borran
+    productos que `resultados_duplicados.csv` señala como candidatos, así que
+    aplicarlos antes de `aurum deliver` haría imposible producir ese artefacto
+    (ADR-001). Sin `--apply` no escribe nada: solo enseña qué haría.
+    """
+    import json
+
+    from .config import ARTIFACTS_DIRECTORY
+    from .data import load_catalog_events
+    from .embeddings import Encoder
+    from .events import EventError, apply_events, classify, snapshot_state
+    from .store.qdrant_store import QdrantStore
+
+    try:
+        settings = load_settings()
+    except ConfigurationError as error:
+        typer.secho(str(error), fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    final = _load_final_config()
+    strategy = final.get("representation", {}).get("text_strategy", "title_brand_color")
+
+    catalog_events = load_catalog_events()
+    store = QdrantStore(settings)
+    status = store.status()
+    if not status.exists or status.points_count == 0:
+        typer.secho(
+            f"La colección {store.collection!r} no está lista. Ejecuta `aurum ingest`.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"{len(catalog_events)} eventos · colección con {status.points_count} puntos "
+        f"· texto {strategy}\n"
+    )
+
+    if not apply:
+        typer.echo("Sin --apply: nada se escribe. Esto es lo que ocurriría.\n")
+        typer.echo(f"{'evento':<10} {'tipo':<15} producto")
+        typer.echo("-" * 60)
+        tally = {"alta": 0, "actualizacion": 0, "baja": 0}
+        for event in catalog_events:
+            kind = classify(event, store)
+            tally[kind] += 1
+            typer.echo(f"{event.event_id:<10} {kind:<15} {event.product_id}")
+        typer.echo(
+            f"\n{tally['alta']} altas · {tally['actualizacion']} actualizaciones "
+            f"· {tally['baja']} bajas"
+        )
+        typer.secho("Ejecuta con --apply para aplicarlos.", fg=typer.colors.YELLOW)
+        return
+
+    encoder = Encoder(settings.embedding_model, batch_size=64)
+    try:
+        report = apply_events(
+            catalog_events,
+            store,
+            encoder,
+            text_strategy=strategy,
+            measure_visibility=verify_visibility,
+            timeout_seconds=timeout,
+        )
+    except EventError as error:
+        typer.secho(f"{error}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from error
+
+    state = snapshot_state(catalog_events, store)
+    typer.echo(
+        f"{report.altas} altas · {report.actualizaciones} actualizaciones · "
+        f"{report.bajas} bajas ({report.bajas_efectivas} efectivas)"
+    )
+    typer.echo(f"puntos: {report.points_before} -> {report.points_after}")
+
+    for probe in report.probes:
+        typer.echo(f"\n[{probe.kind}] {probe.event_id} · {probe.product_id}")
+        if probe.baseline:
+            typer.echo(f"  antes    : {probe.baseline}")
+        typer.echo(f"  escritura: {probe.write_ms:.1f} ms")
+        typer.echo(f"  por ID   : {probe.by_id_ms:.1f} ms · {probe.id_evidence}")
+        typer.echo(
+            f"  por vector: {probe.by_search_ms:.1f} ms · {probe.search_evidence}"
+        )
+
+    second = None
+    if twice:
+        typer.echo("\nSegunda aplicación (idempotencia)…")
+        second = apply_events(
+            catalog_events,
+            store,
+            encoder,
+            text_strategy=strategy,
+            measure_visibility=False,
+            timeout_seconds=timeout,
+        )
+        again = snapshot_state(catalog_events, store)
+        identical = again == state
+        typer.echo(
+            f"{second.altas} altas · {second.actualizaciones} actualizaciones · "
+            f"{second.bajas} bajas ({second.bajas_efectivas} efectivas)"
+        )
+        typer.echo(f"puntos: {second.points_before} -> {second.points_after}")
+        colour = typer.colors.GREEN if identical else typer.colors.RED
+        typer.secho(
+            "Estado idéntico tras la segunda aplicación."
+            if identical
+            else "EL ESTADO CAMBIÓ: los eventos no son idempotentes.",
+            fg=colour,
+        )
+        if not identical:
+            raise typer.Exit(code=1)
+
+    path = ARTIFACTS_DIRECTORY / "events.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, object] = {
+        "first_run": report.as_dict(),
+        "state_after": state,
+    }
+    if second is not None:
+        payload["second_run"] = second.as_dict()
+        payload["idempotent"] = True
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    typer.echo(f"\nEvidencia en {path}")
+    typer.secho("Eventos aplicados.", fg=typer.colors.GREEN)
 
 
 @app.command()
