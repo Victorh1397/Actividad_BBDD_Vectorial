@@ -310,7 +310,7 @@ Un RF pasa a `cerrado` cuando existe evidencia ejecutable, no cuando "el código
 está escrito". `parcial` significa que parte del criterio de aceptación ya está
 cubierta con evidencia y el resto depende de una fase posterior.
 
-**Última actualización:** cierre de la Fase 7 · 358 tests en verde.
+**Última actualización:** cierre de la Fase 8 · 379 tests en verde.
 
 | RF | Estado | Evidencia |
 |---|---|---|
@@ -329,7 +329,7 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-13 | **`cerrado`** | `top_k` configurable en los tres backends y en `aurum search`. |
 | RF-14 | **`cerrado`** | El filtro viaja como `Filter/FieldCondition` dentro de la consulta, con índice `KEYWORD` sobre `brand`. Las 4 consultas reales devuelven **10/10** de la marca pedida, sin intrusos. *(Punto 2 de la checklist)* |
 | RF-15 | **`cerrado`** | Colección inexistente o vacía → `CollectionEmptyError` con instrucción; filtro sin resultados → lista vacía documentada; motor caído → `ProviderUnavailableError` que nombra la URL y sugiere `make up`. |
-| RF-16 | `parcial` | Los 24 eventos cargan ordenados y sin huecos; `CatalogEvent` modela que un `DELETE` opera sobre un ID. Falta aplicarlos (Fase 8, la última del recorrido de ejecución). |
+| RF-16 | **`cerrado`** | Los 24 eventos aplicados por `sequence` sobre el catálogo completo: **8 altas · 8 actualizaciones · 8 bajas**, distinción que el fichero no declara y que sale de leer la colección antes de escribir. Segunda aplicación: `0 altas · 0 bajas efectivas` y estado idéntico. Visibilidad sondeada para los tres tipos por lectura por ID **y** por consulta vectorial, con espera acotada; la baja registra que el producto aparecía en posición 1 **antes** de borrarlo. Evidencia en `.artifacts/events.json`. *(Punto 3 de la checklist)* |
 | RF-17 | **`cerrado`** | Candidatos generados por la base vectorial; regla `score >= 0,9191` con umbral congelado en `config/final.yaml` **antes** de predecir sobre el conjunto ciego ([ADR-008](decisiones/ADR-008-umbral-de-duplicados.md)). `DuplicateDecision` impide por construcción un positivo sin `matched_product_id`. *(Punto 5 de la checklist)* |
 | RF-18 | **`cerrado`** | `aurum reset` exige `AURUM_ALLOW_RESET` **y** `AURUM_CONFIRM_CLEANUP` con el nombre exacto —probado en vivo: sin ambas, se bloquea y explica qué falta—, y ningún recurso fuera del prefijo `aurum-market` es alcanzable. |
 | RF-19 | **`cerrado`** | nDCG@10, Recall@10 y MRR@10 graduadas, contrastadas contra valores calculados a mano en `test_metrics.py`. Umbral ≥ 2 declarado en [ADR-004](decisiones/ADR-004-umbral-de-relevancia.md) y pasado explícitamente en cada llamada. |
@@ -340,9 +340,56 @@ cubierta con evidencia y el resto depende de una fase posterior.
 | RF-24 | **`cerrado`** | Cinco fallos atribuidos en `.artifacts/attribution.json`, cubriendo **tres capas**: representación (3), índice (1) y datos (1). Cada uno con su evidencia; el de índice se provoca bajando `ef_search` a 16, porque con la configuración entregada la fidelidad es 1,0 y ningún fallo real sería suyo. |
 | RF-25 | **`cerrado`** | Los tres artefactos escritos y validados contra su contrato **antes** de tocar disco, y re-validados al leerlos: 120 filas / 12 consultas, 14 decisiones, y las métricas mínimas. Falta el diagrama de arquitectura (Fase 9). |
 | RF-26 | `pendiente` | — |
-| RF-27 | **`cerrado`** | 358 tests cubren IDs, batching, filtros nativos, mutaciones de la colección y formato de resultados, más los siete puntos de la checklist en `test_entrega.py`. |
+| RF-27 | **`cerrado`** | 379 tests cubren IDs, batching, filtros nativos, mutaciones de la colección y formato de resultados, más los siete puntos de la checklist en `test_entrega.py`. |
 | RF-28 | **`cerrado`** | `aurum deliver` regenera los tres artefactos en un solo comando, y un test verifica que **no** aplica los eventos, cosa que ninguna salida delataría. *(Punto 6 de la checklist)* |
 | RF-29 | `pendiente` | — |
+
+### Hallazgos de la Fase 8
+
+22. **El recuento es incapaz de verificar estos eventos.** Los 24 añaden ocho
+    productos y quitan ocho, así que la colección va de 15.000 a 15.000. Una
+    comprobación por totales pasaría aunque no hubiera ocurrido nada. El estado
+    se verifica por identidad —qué IDs están y con qué ficha— y la espera de
+    recuento es **exacta**, no `>=`: un total obsoleto más alto satisface
+    cualquier cota inferior, y aquí el recuento baja.
+23. **El fichero no dice si un `UPSERT` inserta o actualiza.** Solo dice
+    `UPSERT`. Que EVT-001 sea una actualización y EVT-017 un alta depende de lo
+    que la colección tenga en ese instante, así que la clasificación es una
+    observación contra el motor vivo, nunca un dato del CSV. De ahí que la
+    reaplicación informe `0 altas · 16 actualizaciones` **con el mismo estado
+    final**: cambia lo que se informa, no lo que se tiene.
+24. **Las sondas de alta y de baja solo existen en la primera aplicación.** En
+    la segunda no hay ningún alta que observar ni nada que desaparecer. Se
+    descubrió perdiéndolas: `aurum events` aplicó los 24 eventos y murió al
+    imprimir el resumen porque la consola de Windows abre en cp1252 y `→` no
+    existe ahí. El trabajo estaba hecho y la evidencia se perdió por cómo se
+    escribía la salida. Recuperarla exigió volver al estado previo —borrar los
+    8 `AURUM-NEW` y reingerir— y desde entonces `cli.py` reconfigura la salida
+    con `errors="replace"`: un carácter no representable degrada a `?` en lugar
+    de abortar un comando ya terminado.
+25. **Demostrar una baja exige una observación previa.** Que un producto no
+    aparezca después de borrarlo no prueba nada si no aparecía antes. La sonda
+    de baja consulta primero y deja constancia —*"antes de la baja aparecía en
+    la posición 1"*—; si no lo encontrara, lo dice explícitamente en vez de
+    reportar una desaparición vacía.
+26. **Ningún producto se borra y se vuelve a dar de alta.** Los 16 `UPSERT` y
+    los 8 `DELETE` no comparten un solo `product_id`, así que el orden no altera
+    el estado final y la idempotencia sale barata. Conviene saberlo: si hubiera
+    solape, reaplicar el fichero dependería del orden y la garantía sería mucho
+    más delicada. Queda fijado en `test_no_product_is_both_upserted_and_deleted`
+    para que un cambio de datos futuro lo delate.
+27. **Un alta queda encontrable por una consulta que nadie le enseñó.** La
+    sonda solo comprueba que el producto responde a su propia ficha, que es un
+    listón bajo. Buscando de verdad, `"taladro 24v batería"` devuelve
+    `AURUM-NEW-001` en posición 1 con 0,8784 —por delante de los 70 taladros
+    reales del catálogo— y `"silla ergonómica de oficina con apoyo lumbar"`
+    devuelve `AURUM-NEW-002` con 0,9096. Es la diferencia entre una escritura
+    confirmada y un producto que existe para el usuario.
+28. **EVT-009 borra `B081JP8CC6`, que es el candidato que la entrega señala.**
+    Cinco de los ocho productos eliminados son `matched_product_id` en
+    `resultados_duplicados.csv`. Es [ADR-001](decisiones/ADR-001-orden-canonico-de-ejecucion.md)
+    demostrado sobre el artefacto ya escrito: con los eventos por delante, esas
+    predicciones apuntarían a productos inexistentes.
 
 ### Hallazgos de la Fase 7
 

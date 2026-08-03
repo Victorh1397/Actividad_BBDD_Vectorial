@@ -66,7 +66,14 @@ Cosas que ya han costado tiempo una vez:
   final**, después de `aurum deliver`. Fijado en
   [ADR-001](specs/decisiones/ADR-001-orden-canonico-de-ejecucion.md) y no se altera.
 - **Los eventos son irreversibles.** Tras aplicarlos, repetir el recorrido de
-  medición exige reingerir el catálogo desde cero.
+  medición exige reingerir el catálogo desde cero. Y las sondas de visibilidad
+  de un *alta* y de una *baja* solo pueden observarse en la **primera**
+  aplicación: en la segunda no hay nada que nazca ni nada que desaparezca.
+- **La consola de Windows abre en cp1252.** Un carácter fuera de ese juego —`→`,
+  `✓`, cualquier flecha o emoji— levanta `UnicodeEncodeError` y mata el comando
+  al imprimir, con el trabajo ya hecho. `cli.py` reconfigura la salida con
+  `errors="replace"` para que degrade a `?` en vez de abortar, pero no escribas
+  esos caracteres en mensajes de usuario.
 - **Qdrant puede responder sin usar su índice.** Los umbrales
   `indexing_threshold` y `full_scan_threshold` están en **kilobytes** y se
   aplican **por segmento**, no por colección. Con los valores por defecto la
