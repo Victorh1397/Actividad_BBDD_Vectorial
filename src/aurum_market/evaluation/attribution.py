@@ -44,9 +44,7 @@ LAYER_DESCRIPTIONS: dict[Layer, str] = {
         "Falta información en la ficha, el metadato es inconsistente o la "
         "consulta excluye el producto."
     ),
-    "persistencia": (
-        "El estado leído todavía no coincide con la escritura aplicada."
-    ),
+    "persistencia": ("El estado leído todavía no coincide con la escritura aplicada."),
 }
 
 

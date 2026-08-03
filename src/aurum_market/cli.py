@@ -764,7 +764,9 @@ def duplicates_predict(
 def deliver(
     profile: str = typer.Option("full", "--profile", help="Perfil ingerido."),
     top_k: int = typer.Option(10, "--top-k", help="Profundidad del ranking."),
-    repetitions: int = typer.Option(10, "--repetitions", help="Repeticiones de latencia."),
+    repetitions: int = typer.Option(
+        10, "--repetitions", help="Repeticiones de latencia."
+    ),
 ) -> None:
     """Regenera los tres artefactos de entrega. Comando único (RF-28).
 
@@ -796,7 +798,10 @@ def deliver(
         demonstrate_index_failure,
         summarize,
     )
-    from .evaluation.fidelity import check_brand_filters, measure_fidelity, summarize_filters
+    from .evaluation.fidelity import (
+        check_brand_filters,
+        measure_fidelity,
+    )
     from .evaluation.latency import describe_environment, measure_latency
     from .evaluation.metrics import evaluate_rankings
     from .search import DenseRetriever, build_live_retriever
@@ -921,9 +926,11 @@ def deliver(
     }
 
     try:
-        search_path = write_search_results(blind)
-        duplicates_path = write_duplicate_results(decisions)
-        metrics_path = write_development_metrics(metrics_payload)
+        # Cada uno valida contra su contrato antes de tocar el disco: si alguno
+        # falla, no se escribe ninguno a medias.
+        write_search_results(blind)
+        write_duplicate_results(decisions)
+        write_development_metrics(metrics_payload)
     except Exception as error:
         typer.secho(f"\n{type(error).__name__}: {error}", fg=typer.colors.RED)
         raise typer.Exit(code=1) from error
